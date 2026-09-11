@@ -1,12 +1,14 @@
 import React, { useRef, useState, useEffect } from 'react';
 import type { MapRef } from 'react-map-gl/maplibre';
 import Navbar from '../components/Navbar';
+import KpiStrip from '../components/KpiStrip';
 import Map from '../components/Map';
 import MapControls from '../components/MapControls';
-import Legend from '../components/Legend';
+import MapLegend from '../components/MapLegend';
+import ActivityRail from '../components/ActivityRail';
 import RightPanel from '../components/RightPanel';
 import BottomAnalytics from '../components/BottomAnalytics';
-import { AlertCircle, ArrowRight, SlidersHorizontal, Info, X } from 'lucide-react';
+import { SlidersHorizontal, Info, X } from 'lucide-react';
 import { useMapStore } from '../store/mapStore';
 
 export default function MapPage(): React.JSX.Element {
@@ -15,82 +17,64 @@ export default function MapPage(): React.JSX.Element {
   const selectedHotspotId = useMapStore((s) => s.selectedHotspotId);
   const selectedFacilityId = useMapStore((s) => s.selectedFacilityId);
 
-  const [isMobileLegendOpen, setIsMobileLegendOpen] = useState(false);
-  const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [isPanelDrawerOpen, setIsPanelDrawerOpen] = useState(false);
 
   useEffect(() => {
     fetchAndSetLatestDate();
   }, [fetchAndSetLatestDate]);
 
-  // Automatically open mobile panel drawer when a hotspot or facility is selected on mobile/tablet
+  // Auto-open panel drawer on mobile when something is selected
   useEffect(() => {
     if (selectedHotspotId || selectedFacilityId) {
       if (window.innerWidth < 1024) {
-        setIsMobilePanelOpen(true);
+        setIsPanelDrawerOpen(true);
       }
     }
   }, [selectedHotspotId, selectedFacilityId]);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#080C14] text-[#E8EDF5] select-none">
-      {/* 1. NAVBAR (Fixed Height ~48px) */}
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#060912] text-[#D0DAE8] select-none">
+      {/* ── 1. TOP NAVIGATION ─────────────────────────────────────────── */}
       <Navbar />
 
-      {/* 2. THREE-COLUMN DASHBOARD LAYOUT */}
+      {/* ── 2. KPI STRIP ──────────────────────────────────────────────── */}
+      <KpiStrip />
+
+      {/* ── 3. MAIN WORKSPACE ─────────────────────────────────────────── */}
       <main className="flex-1 min-h-0 flex w-full overflow-hidden relative">
-        {/* LEFT COLUMN: Legend & Filters (FULL HEIGHT ON DESKTOP) */}
-        <div className="hidden md:block w-[260px] lg:w-[280px] shrink-0 h-full overflow-hidden border-r border-[#1e293b] bg-[#0D121F]">
-          <Legend />
+        {/* ── LEFT: Activity/Filter Rail (desktop only - Full Height) ─── */}
+        <div className="hidden lg:block w-[220px] xl:w-[240px] shrink-0 h-full overflow-hidden border-r border-[#111A26]">
+          <ActivityRail />
         </div>
 
-        {/* CENTER COLUMN: Split Vertically (Alert banner + Map on top, Past Activity below) */}
-        <div className="flex-1 min-w-0 h-full flex flex-col overflow-hidden bg-[#080C14] relative">
-          {/* SYSTEM ALERT NOTIFICATION BAR (Contained to Map Width Only) */}
-          <div className="bg-[rgba(220,38,38,0.12)] border-b border-[rgba(220,38,38,0.3)] px-3 sm:px-4 py-1 flex items-center justify-between text-xs shrink-0 h-7">
-            <div className="flex items-center gap-2 text-[11px] truncate">
-              <span className="flex items-center gap-1 font-bold text-[#FF4444] shrink-0">
-                <AlertCircle className="w-3.5 h-3.5" />
-                Active Alerts
-              </span>
-              <span className="text-[#6B7280]">|</span>
-              <span className="text-[#E8EDF5] truncate">
-                Near-real-time thermal anomaly monitoring — India
-              </span>
-              <span className="hidden sm:inline text-[#6B7280] font-mono text-[9px]">NRT</span>
-            </div>
-            <a
-              href="/incidents"
-              className="text-[10px] font-semibold text-[#2D7DD2] hover:underline flex items-center gap-0.5 shrink-0"
-            >
-              <span>View All</span>
-              <ArrowRight className="w-3 h-3" />
-            </a>
-          </div>
-
-          {/* Top: Map Area (flex-1) */}
-          <div className="flex-1 min-h-0 w-full relative overflow-hidden bg-[#080C14]">
+        {/* ── CENTER: Map & Thermal Activity Trend Chart ────────────── */}
+        <div className="flex-1 min-w-0 h-full flex flex-col overflow-hidden relative bg-[#060912]">
+          {/* Map view area */}
+          <div className="flex-1 min-h-0 w-full relative overflow-hidden">
             <Map mapRef={mapRef} />
             <MapControls mapRef={mapRef} />
+            <MapLegend />
 
-            {/* Mobile/Tablet Quick Drawer Trigger Buttons */}
-            <div className="absolute top-3 left-3 z-30 flex items-center gap-2 md:hidden">
+            {/* Mobile floating buttons */}
+            <div className="absolute top-3 left-3 z-30 flex items-center gap-2 lg:hidden">
               <button
                 type="button"
-                onClick={() => setIsMobileLegendOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#111827]/90 border border-[#1e293b] text-[#E8EDF5] shadow-lg backdrop-blur-md hover:bg-[#1E2D45] transition-colors"
-                title="Open Legend & Filters"
+                onClick={() => setIsFilterDrawerOpen(true)}
+                aria-label="Open filters"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#080C14]/90 border border-[#1E2D45] text-[#D0DAE8] shadow-lg backdrop-blur-md hover:bg-[#0F1A2B] transition-colors"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 text-[#2D7DD2]" />
                 <span>Filters</span>
               </button>
             </div>
 
-            <div className="absolute top-3 right-24 z-30 flex items-center gap-2 lg:hidden">
+            <div className="absolute top-3 right-24 z-30 flex items-center gap-2 xl:hidden">
               <button
                 type="button"
-                onClick={() => setIsMobilePanelOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#111827]/90 border border-[#1e293b] text-[#E8EDF5] shadow-lg backdrop-blur-md hover:bg-[#1E2D45] transition-colors"
-                title="Open Intelligence Panel"
+                onClick={() => setIsPanelDrawerOpen(true)}
+                aria-label="Open intelligence panel"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#080C14]/90 border border-[#1E2D45] text-[#D0DAE8] shadow-lg backdrop-blur-md hover:bg-[#0F1A2B] transition-colors"
               >
                 <Info className="w-3.5 h-3.5 text-[#2D7DD2]" />
                 <span className="hidden sm:inline">Intelligence</span>
@@ -98,45 +82,71 @@ export default function MapPage(): React.JSX.Element {
             </div>
           </div>
 
-          {/* Bottom: Past Activity Dashboard (Center-Only Width, aligned with Map) */}
-          <div className="h-[150px] sm:h-[160px] lg:h-[175px] shrink-0 w-full border-t border-[#1e293b] overflow-hidden bg-[#080C14]">
+          {/* Thermal Activity Trend / Bottom Analytics Strip (100% width of center column) */}
+          <div className="h-[140px] sm:h-[152px] shrink-0 w-full border-t border-[#111A26] overflow-hidden">
             <BottomAnalytics />
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Intelligence Panel (FULL HEIGHT ON DESKTOP) */}
-        <div className="hidden lg:block w-[320px] lg:w-[340px] shrink-0 h-full overflow-hidden border-l border-[#1e293b] bg-[#0D121F]">
+        {/* ── RIGHT: Intelligence Panel (desktop xl+ - Full Height) ──── */}
+        <div className="hidden xl:block w-[300px] 2xl:w-[320px] shrink-0 h-full overflow-hidden border-l border-[#111A26]">
           <RightPanel />
         </div>
       </main>
 
-      {/* MOBILE LEGEND DRAWER OVERLAY (< 768px) */}
-      {isMobileLegendOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-start md:hidden">
-          <div className="w-[280px] h-full bg-[#0D121F] border-r border-[#1e293b] flex flex-col relative shadow-2xl animate-in slide-in-from-left duration-200">
-            <div className="p-2 border-b border-[#1e293b] flex justify-end bg-[#090D16]">
+      {/* ── FILTER DRAWER (< lg) ──────────────────────────────────────── */}
+      {isFilterDrawerOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-start lg:hidden"
+          onClick={() => setIsFilterDrawerOpen(false)}
+          aria-modal="true"
+          role="dialog"
+          aria-label="Filter panel"
+        >
+          <div
+            className="w-[240px] h-full bg-[#080C14] border-r border-[#1E2D45] flex flex-col relative shadow-2xl animate-in slide-in-from-left duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-2 border-b border-[#1E2D45] flex items-center justify-between bg-[#06090F] shrink-0">
+              <span className="text-[10px] font-bold text-[#3B5070] uppercase tracking-widest">
+                Filters
+              </span>
               <button
-                onClick={() => setIsMobileLegendOpen(false)}
-                className="p-1 text-[#6B7280] hover:text-white rounded-md bg-[#162033]"
+                onClick={() => setIsFilterDrawerOpen(false)}
+                aria-label="Close filter panel"
+                className="p-1 text-[#3B5070] hover:text-[#D0DAE8] rounded-md bg-[#0C1520] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="flex-1 overflow-hidden">
-              <Legend />
+              <ActivityRail />
             </div>
           </div>
         </div>
       )}
 
-      {/* MOBILE RIGHT PANEL DRAWER OVERLAY (< 1024px) */}
-      {isMobilePanelOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-end lg:hidden">
-          <div className="w-[320px] max-w-[calc(100vw-2rem)] h-full bg-[#0D121F] border-l border-[#1e293b] flex flex-col relative shadow-2xl animate-in slide-in-from-right duration-200">
-            <div className="p-2 border-b border-[#1e293b] flex justify-end bg-[#090D16]">
+      {/* ── INTELLIGENCE PANEL DRAWER (< xl) ──────────────────────────── */}
+      {isPanelDrawerOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-end xl:hidden"
+          onClick={() => setIsPanelDrawerOpen(false)}
+          aria-modal="true"
+          role="dialog"
+          aria-label="Intelligence panel"
+        >
+          <div
+            className="w-[300px] max-w-[calc(100vw-2rem)] h-full bg-[#080C14] border-l border-[#1E2D45] flex flex-col relative shadow-2xl animate-in slide-in-from-right duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-2 border-b border-[#1E2D45] flex items-center justify-between bg-[#06090F] shrink-0">
+              <span className="text-[10px] font-bold text-[#3B5070] uppercase tracking-widest">
+                Intelligence Panel
+              </span>
               <button
-                onClick={() => setIsMobilePanelOpen(false)}
-                className="p-1 text-[#6B7280] hover:text-white rounded-md bg-[#162033]"
+                onClick={() => setIsPanelDrawerOpen(false)}
+                aria-label="Close intelligence panel"
+                className="p-1 text-[#3B5070] hover:text-[#D0DAE8] rounded-md bg-[#0C1520] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>

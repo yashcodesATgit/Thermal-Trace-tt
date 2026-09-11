@@ -1,4 +1,4 @@
-import type { Hotspot, HotspotType } from '../types/hotspot';
+import type { Hotspot, HotspotType, ActivityStatus } from '../types/hotspot';
 import type { Facility, FacilityType } from '../types/facility';
 
 export interface GeoJSONFeature {
@@ -23,7 +23,10 @@ export function hotspotsToGeoJSON(hotspots: Hotspot[]): GeoJSONFeatureCollection
   return {
     type: 'FeatureCollection',
     features: hotspots.map((h) => {
-      const effectiveType = h.mlType || h.type;
+      const effectiveType = h.mlType || h.type || 'unknown';
+      const actStatus = h.activityStatus || 'new';
+      const obsCount = h.sourceObsCount || 1;
+      const isPersistent = actStatus === 'persistent' || obsCount >= 3;
       return {
         type: 'Feature' as const,
         geometry: {
@@ -44,9 +47,11 @@ export function hotspotsToGeoJSON(hotspots: Hotspot[]): GeoJSONFeatureCollection
           timestamp: h.timestamp,
           facilityId: h.facilityId,
           status: h.status,
-          // Normalized brightness for heatmap weight (0-1 range)
+          activityStatus: actStatus,
+          sourceObsCount: obsCount,
+          isPersistent: isPersistent ? 1 : 0,
+          frp: h.frp ?? null,
           normalizedBrightness: Math.min(1, Math.max(0, (h.brightness - 240) / (360 - 240))),
-          // Combined weight using brightness and confidence
           heatWeight: Math.min(
             1,
             Math.max(
@@ -90,15 +95,12 @@ export function facilitiesToGeoJSON(facilities: Facility[]): GeoJSONFeatureColle
  * and Union Territories. Filters out points that fall outside India.
  */
 export function isInsideIndia(lat: number, lon: number): boolean {
-  // 1. Primary bounding box check for India & UTs (6.0°N to 37.1°N, 68.0°E to 97.4°E)
   if (lat < 6.0 || lat > 37.1 || lon < 68.0 || lon > 97.4) {
     return false;
   }
-  // 2. Exclude Sri Lanka (south of 10.0°N and east of 79.5°E)
   if (lat < 10.0 && lon > 79.5) {
     return false;
   }
-  // 3. Exclude Pakistan (west of Indian border)
   if (lon < 68.1) {
     return false;
   }
@@ -117,11 +119,9 @@ export function isInsideIndia(lat: number, lon: number): boolean {
   if (lat >= 32.5 && lon < 73.8) {
     return false;
   }
-  // 4. Exclude Nepal
   if (lat >= 27.3 && lat <= 30.5 && lon >= 80.0 && lon <= 88.2) {
     return false;
   }
-  // 5. Exclude Bangladesh
   if (lat > 20.6 && lat < 26.6 && lon > 88.0 && lon < 92.6) {
     const isWb = lon <= 88.8 || lat <= 21.8;
     const isTripura = lat >= 22.8 && lat <= 24.6 && lon >= 91.1 && lon <= 92.4;
@@ -131,7 +131,6 @@ export function isInsideIndia(lat: number, lon: number): boolean {
       return false;
     }
   }
-  // 6. Exclude Myanmar
   if (lon > 97.4) {
     return false;
   }
@@ -145,15 +144,17 @@ export function isInsideIndia(lat: number, lon: number): boolean {
 }
 
 /**
- * Filter hotspots by effective ML classification type and India boundary.
+ * Filter hotspots by ML classification, activity status, and India boundary.
  */
 export function filterHotspots(
   hotspots: Hotspot[],
   activeTypes: HotspotType[],
+  activeActivityStatuses?: ActivityStatus[],
 ): Hotspot[] {
   return hotspots.filter(
     (h) =>
       activeTypes.includes(h.mlType || h.type) &&
+      (!activeActivityStatuses || activeActivityStatuses.includes(h.activityStatus || 'new')) &&
       isInsideIndia(h.latitude, h.longitude),
   );
 }

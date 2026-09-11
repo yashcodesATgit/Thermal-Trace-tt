@@ -2,7 +2,7 @@ import type { Facility } from '../types/facility';
 import api from './api';
 
 /**
- * Fetch facility data from FastAPI backend.
+ * Fetch facility data from Express backend.
  * Phase 4: calls GET /api/v1/facilities
  */
 export async function fetchFacilities(): Promise<Facility[]> {
@@ -11,4 +11,3 @@ export async function fetchFacilities(): Promise<Facility[]> {
   });
   return response.data.data as Facility[];
 }
-

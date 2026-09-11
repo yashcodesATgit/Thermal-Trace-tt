@@ -36,7 +36,7 @@ export default function IncidentTable({
     }
     navigate('/');
   };
-  
+
   const [sortField, setSortField] = useState<SortField>('timestamp');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
@@ -123,25 +123,25 @@ export default function IncidentTable({
               <th className="py-2.5 sm:py-3 px-3 sm:px-4">INCIDENT ID</th>
               <th className="py-2.5 sm:py-3 px-3 sm:px-4">TYPE</th>
               <th className="py-2.5 sm:py-3 px-3 sm:px-4">FACILITY</th>
-              <th 
+              <th
                 className="py-2.5 sm:py-3 px-3 sm:px-4 cursor-pointer hover:text-[#E8EDF5]"
                 onClick={() => toggleSort('brightness')}
               >
                 BRIGHTNESS <SortIcon field="brightness" />
               </th>
-              <th 
+              <th
                 className="py-2.5 sm:py-3 px-3 sm:px-4 cursor-pointer hover:text-[#E8EDF5]"
                 onClick={() => toggleSort('confidence')}
               >
                 CONFIDENCE <SortIcon field="confidence" />
               </th>
-              <th 
+              <th
                 className="py-2.5 sm:py-3 px-3 sm:px-4 cursor-pointer hover:text-[#E8EDF5]"
                 onClick={() => toggleSort('timestamp')}
               >
                 DETECTED <SortIcon field="timestamp" />
               </th>
-              <th 
+              <th
                 className="py-2.5 sm:py-3 px-3 sm:px-4 cursor-pointer hover:text-[#E8EDF5]"
                 onClick={() => toggleSort('severity')}
               >
@@ -166,7 +166,7 @@ export default function IncidentTable({
                   : 'text-[#2D7DD2]';
 
               return (
-                <tr 
+                <tr
                   key={inc.id}
                   onClick={() => handleRowClick(inc)}
                   className="hover:bg-[#162033]/60 cursor-pointer transition-colors"

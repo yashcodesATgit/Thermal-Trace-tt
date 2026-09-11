@@ -7,6 +7,7 @@ import IncidentsPage from './pages/IncidentsPage';
 import FacilitiesPage from './pages/FacilitiesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ReportsPage from './pages/ReportsPage';
+import HowItWorksPage from './pages/HowItWorksPage';
 
 export default function App(): React.JSX.Element {
   return (
@@ -18,6 +19,7 @@ export default function App(): React.JSX.Element {
           <Route path="/facilities" element={<FacilitiesPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/how-it-works" element={<HowItWorksPage />} />
         </Routes>
       </Router>
     </QueryClientProvider>

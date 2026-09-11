@@ -1,1 +1,0 @@
-# FIRMS integration package

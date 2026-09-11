@@ -11,8 +11,8 @@ RUN npm ci
 # Copy frontend application source
 COPY . .
 
-# Inject build-time API base URL configuration (defaults to http://localhost:8000 for browser client)
-ARG VITE_API_BASE_URL=http://localhost:8000
+# Inject build-time API base URL configuration (defaults to http://localhost:8080 for browser client)
+ARG VITE_API_BASE_URL=http://localhost:8080
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # Build production bundle

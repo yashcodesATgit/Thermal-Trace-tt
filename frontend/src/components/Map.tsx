@@ -43,6 +43,7 @@ export default function Map({ mapRef }: MapComponentProps): React.JSX.Element {
   const selectedHotspotId = useMapStore((s) => s.selectedHotspotId);
   const selectedFacilityId = useMapStore((s) => s.selectedFacilityId);
   const activeHotspotTypes = useMapStore((s) => s.activeHotspotTypes);
+  const activeActivityStatuses = useMapStore((s) => s.activeActivityStatuses);
   const activeFacilityTypes = useMapStore((s) => s.activeFacilityTypes);
   const minimumConfidence = useMapStore((s) => s.minimumConfidence);
   const selectedDate = useMapStore((s) => s.selectedDate);
@@ -104,8 +105,8 @@ export default function Map({ mapRef }: MapComponentProps): React.JSX.Element {
   // Filtered Hotspots (memoized)
   const filteredHotspots = useMemo(() => {
     if (!hotspots) return [];
-    return filterHotspots(hotspots, activeHotspotTypes);
-  }, [hotspots, activeHotspotTypes]);
+    return filterHotspots(hotspots, activeHotspotTypes, activeActivityStatuses);
+  }, [hotspots, activeHotspotTypes, activeActivityStatuses]);
 
   // Filtered Facilities (memoized)
   const filteredFacilities = useMemo(() => {
@@ -238,10 +239,16 @@ export default function Map({ mapRef }: MapComponentProps): React.JSX.Element {
                 ? 'bg-amber-950/60 text-amber-400 border border-amber-500/30'
                 : firmsStatus?.status === 'degraded'
                 ? 'bg-red-950/60 text-red-400 border border-red-500/30'
-                : 'bg-orange-950/60 text-orange-400 border border-orange-500/30'
+                : firmsStatus?.status === 'stale'
+                ? 'bg-slate-900/60 text-slate-400 border border-slate-500/30'
+                : 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30'
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full ${
-                firmsStatus?.status === 'live' ? 'bg-emerald-400 animate-pulse' : firmsStatus?.status === 'delayed' ? 'bg-amber-400' : 'bg-red-400'
+                firmsStatus?.status === 'live' ? 'bg-emerald-400 animate-pulse'
+                : firmsStatus?.status === 'delayed' ? 'bg-amber-400'
+                : firmsStatus?.status === 'degraded' ? 'bg-red-400'
+                : firmsStatus?.status === 'stale' ? 'bg-slate-400'
+                : 'bg-emerald-400 animate-pulse'
               }`} />
               {firmsStatus?.status ? firmsStatus.status.toUpperCase() : 'LIVE'}
             </span>
@@ -437,10 +444,10 @@ export default function Map({ mapRef }: MapComponentProps): React.JSX.Element {
                   10, 6,
                   15, 9,
                 ],
-                'circle-color': '#2D7DD2',
-                'circle-stroke-width': 2,
-                'circle-stroke-color': '#E8EDF5',
-                'circle-opacity': 0.85,
+                'circle-color': 'rgba(6,182,212,0.1)',
+                'circle-stroke-width': 1.5,
+                'circle-stroke-color': '#06B6D4',
+                'circle-opacity': 0.9,
               }}
             />
           </Source>
@@ -486,8 +493,8 @@ export default function Map({ mapRef }: MapComponentProps): React.JSX.Element {
             type="circle"
             paint={{
               'circle-radius': 18,
-              'circle-color': '#2D7DD2',
-              'circle-opacity': 0.25,
+              'circle-color': '#06B6D4',
+              'circle-opacity': 0.2,
               'circle-blur': 0.5,
             }}
           />
@@ -495,10 +502,10 @@ export default function Map({ mapRef }: MapComponentProps): React.JSX.Element {
             id="facility-selected-point"
             type="circle"
             paint={{
-              'circle-radius': 7,
-              'circle-color': '#2D7DD2',
+              'circle-radius': 8,
+              'circle-color': '#080C14',
               'circle-stroke-width': 2.5,
-              'circle-stroke-color': '#E8EDF5',
+              'circle-stroke-color': '#06B6D4',
               'circle-opacity': 1,
             }}
           />

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, Link } from 'react-router-dom';
 import {
   Flame,
   Map as MapIcon,
@@ -18,7 +18,8 @@ import {
   LogIn,
   UserPlus,
   LogOut,
-  Menu
+  Menu,
+  BookOpen
 } from 'lucide-react';
 import { useMapStore } from '../store/mapStore';
 import { useAlertsQuery } from '../services/queries/useAlertsQuery';
@@ -75,14 +76,15 @@ export default function Navbar(): React.JSX.Element {
   };
 
   const { data: alerts, isLoading: alertsLoading } = useAlertsQuery();
-  const unackCount = alerts?.filter((a) => !a.acknowledged).length ?? alerts?.length ?? 6;
+  const unackCount = alerts?.filter((a) => !a.acknowledged).length ?? 0;
 
   const navItems: NavItem[] = [
-    { label: 'Live Map', path: '/', Icon: MapIcon },
+    { label: 'Map', path: '/', Icon: MapIcon },
     { label: 'Incidents', path: '/incidents', Icon: Home },
     { label: 'Facilities', path: '/facilities', Icon: LayoutGrid },
     { label: 'Analytics', path: '/analytics', Icon: BarChart2 },
     { label: 'Reports', path: '/reports', Icon: FileText },
+    { label: 'How It Works', path: '/how-it-works', Icon: BookOpen },
   ];
 
   // Close popovers on click outside
@@ -136,24 +138,25 @@ export default function Navbar(): React.JSX.Element {
   };
 
   return (
-    <header className="relative z-40 w-full flex items-center justify-between select-none shrink-0 bg-[#0A0E17] border-b border-[#1e293b] px-3 sm:px-4 h-12">
-      {/* Brand Branding */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center justify-center rounded-lg w-7 h-7 bg-[rgba(255,68,68,0.12)] border border-[rgba(255,68,68,0.3)] shrink-0">
-          <Flame className="w-4 h-4 text-[#FF4444]" />
+    <header className="relative z-40 w-full flex items-center justify-between select-none shrink-0 bg-[#06090F] border-b border-[#111A26] px-3 sm:px-4 h-[52px]">
+      {/* Brand */}
+      <Link to="/" className="flex items-center gap-2 cursor-pointer hover:opacity-90 transition-opacity">
+        <div className="flex items-center justify-center rounded-lg w-7 h-7 bg-[rgba(255,68,68,0.1)] border border-[rgba(255,68,68,0.25)] shrink-0">
+          <Flame className="w-4 h-4 text-[#EF4444]" />
         </div>
         <div className="flex flex-col">
-          <span className="font-bold text-xs tracking-wider text-[#E8EDF5] leading-none">
-            THERMAL<span className="text-[#FF4444]">TRACE</span>
+          <span className="font-bold text-xs tracking-wider text-[#C8D4E3] leading-none">
+            THERMAL<span className="text-[#EF4444]">TRACE</span>
           </span>
-          <span className="hidden sm:block text-[8px] text-[#6B7280] font-mono tracking-tight">
-            AI-POWERED GEOSPATIAL THERMAL INTELLIGENCE
+          <span className="hidden sm:block text-[8px] text-[#2A3D55] font-mono tracking-tight">
+            Geospatial Thermal Intelligence
           </span>
         </div>
-      </div>
+      </Link>
+
 
       {/* Navigation Tabs (Desktop >= 1024px) */}
-      <nav className="hidden lg:flex items-center gap-1">
+      <nav className="hidden lg:flex items-center gap-0.5">
         {navItems.map((item) => {
           const ItemIcon = item.Icon;
           return (
@@ -162,10 +165,10 @@ export default function Navbar(): React.JSX.Element {
               to={item.path}
               end={item.path === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all ${
+                `flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-all rounded-md ${
                   isActive
-                    ? 'text-[#2D7DD2] border-b-2 border-[#2D7DD2] bg-[rgba(45,125,210,0.08)]'
-                    : 'text-[#8B9BB4] hover:text-[#E8EDF5] hover:bg-[#111827]'
+                    ? 'text-[#D0DAE8] bg-[rgba(45,125,210,0.12)] font-semibold'
+                    : 'text-[#3B5070] hover:text-[#7A8FA8] hover:bg-[#0C1520]'
                 }`
               }
             >

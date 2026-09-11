@@ -48,7 +48,7 @@ export function downloadIncidentsCsv(incidents: Incident[], filename: string) {
 
   const csvContent = [headers.join(','), ...rows].join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  
+
   // Create download link and trigger
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

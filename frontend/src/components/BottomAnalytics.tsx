@@ -1,21 +1,33 @@
-import React, { useMemo } from 'react';
-import { CalendarDays } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Activity, BrainCircuit } from 'lucide-react';
 import { useMapStore } from '../store/mapStore';
 import { useActivityQuery } from '../services/queries/useActivityQuery';
 import type { HotspotType } from '../types/hotspot';
-import { HOTSPOT_COLORS, HOTSPOT_LABELS } from '../types/hotspot';
-
+import { HOTSPOT_COLORS } from '../types/hotspot';
 import { getTodayISTString, formatISTDateLabel } from '../utils/dateUtils';
 
 interface DateItem {
   label: string;
   isoDate: string;
-  isToday?: boolean;
+  isToday: boolean;
   counts: Record<HotspotType, number>;
-  countsUnique: Record<HotspotType, number>;
   total: number;
   uniqueSources: number;
 }
+
+const CLASSIFICATION_TYPES: HotspotType[] = [
+  'industrial_thermal_source',
+  'mining_thermal_source',
+  'natural_fire',
+  'unknown',
+];
+
+const CLASSIFICATION_DISPLAY_LABELS: Record<HotspotType, string> = {
+  industrial_thermal_source: 'Industrial Thermal Source',
+  mining_thermal_source: 'Mining Thermal Source',
+  natural_fire: 'Natural Fire',
+  unknown: 'Unknown / Unclassified',
+};
 
 export default function BottomAnalytics(): React.JSX.Element {
   const selectedDate = useMapStore((s) => s.selectedDate);
@@ -23,164 +35,242 @@ export default function BottomAnalytics(): React.JSX.Element {
   const minimumConfidence = useMapStore((s) => s.minimumConfidence);
   const todayIST = getTodayISTString();
 
-  // Always fetch 7-day activity sequence ending on Today IST for NRT monitoring
+  const [mode, setMode] = useState<'activity' | 'classification'>('activity');
+
   const { data: activityData } = useActivityQuery(todayIST, minimumConfidence);
 
-  // 7-day date items computed dynamically from backend aggregation
   const dates: DateItem[] = useMemo(() => {
-    if (!activityData || !activityData.days) return [];
-
+    if (!activityData?.days) return [];
     return activityData.days.map((day) => {
-      const label = formatISTDateLabel(day.date, false);
-      const isToday = day.date === todayIST;
-      
       const counts: Record<HotspotType, number> = {
         industrial_thermal_source: day.byType.industrialThermalSource || 0,
         mining_thermal_source: day.byType.miningThermalSource || 0,
         natural_fire: day.byType.naturalFire || 0,
         unknown: day.byType.unknown || 0,
       };
-
-      const countsUnique: Record<HotspotType, number> = {
-        industrial_thermal_source: day.byTypeUnique?.industrialThermalSource || 0,
-        mining_thermal_source: day.byTypeUnique?.miningThermalSource || 0,
-        natural_fire: day.byTypeUnique?.naturalFire || 0,
-        unknown: day.byTypeUnique?.unknown || 0,
-      };
-
       return {
-        label,
+        label: formatISTDateLabel(day.date, false),
         isoDate: day.date,
-        isToday,
+        isToday: day.date === todayIST,
         counts,
-        countsUnique,
-        total: day.total,
+        total: day.total || 0,
         uniqueSources: day.uniqueSources || 0,
       };
     });
   }, [activityData, todayIST]);
 
-  // Find max total count among all 7 days for relative height scaling
-  const maxTotal = useMemo(() => {
-    const totals = dates.map((d) =>
-      d.counts.industrial_thermal_source + d.counts.mining_thermal_source + d.counts.natural_fire,
-    );
-    return Math.max(...totals, 10);
-  }, [dates]);
-
-  const categories: HotspotType[] = [
-    'industrial_thermal_source',
-    'mining_thermal_source',
-    'natural_fire',
-    'unknown',
-  ];
+  const maxVal = useMemo(
+    () => Math.max(...dates.map((d) => Math.max(d.total, d.uniqueSources)), 10),
+    [dates],
+  );
 
   return (
-    <footer className="w-full h-full bg-[#080C14] border-t border-[#1e293b] flex flex-col justify-between p-3 select-none overflow-hidden">
-      {/* Header Row */}
-      <div className="flex items-center justify-between shrink-0 mb-1 px-1">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="w-3.5 h-3.5 text-[#2D7DD2]" />
-          <span className="text-[11px] font-bold text-[#E8EDF5] tracking-wider uppercase whitespace-nowrap">
-            HOTSPOT ACTIVITY — LAST 7 DAYS (ALL INDIA)
-          </span>
+    <footer className="w-full h-full bg-[#0C1520] border-t border-[#111A26] flex flex-col select-none overflow-hidden">
+      {/* ── HEADER ──────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-3 sm:px-4 py-1.5 shrink-0 border-b border-[#161F2E] gap-2">
+        {/* Title & Subtitle */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] sm:text-[11px] font-bold text-[#E8EDF5] uppercase tracking-wider font-mono">
+                {mode === 'activity' ? 'THERMAL ACTIVITY' : 'SOURCE CLASSIFICATION'}
+              </span>
+            </div>
+            <span className="text-[9px] text-[#7A8FA8] truncate hidden sm:block">
+              {mode === 'activity'
+                ? 'FIRMS detections and unique thermal-source activity'
+                : 'Daily distribution of thermal-source classifications'}
+            </span>
+          </div>
         </div>
 
-        {/* Category Legend Badges */}
-        <div className="flex items-center gap-4 text-[10px] font-medium">
-          {categories.map((cat) => (
-            <span key={cat} className="flex items-center gap-1.5 text-[#9CA3AF]">
-              <span
-                className="w-2.5 h-2.5 rounded-sm shrink-0"
-                style={{ backgroundColor: HOTSPOT_COLORS[cat] }}
-              />
-              <span className="hidden md:inline">{HOTSPOT_LABELS[cat]}</span>
-            </span>
-          ))}
+        {/* Legend in Header (Desktop >= lg) */}
+        <div className="hidden lg:flex items-center gap-3 px-2">
+          {mode === 'activity' ? (
+            <>
+              <div className="flex items-center gap-1.5 text-[9px] text-[#8B9BB4] font-medium">
+                <span className="w-2.5 h-2.5 rounded-sm bg-[#FF4444]" />
+                <span>FIRMS Detections</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[9px] text-[#8B9BB4] font-medium">
+                <span className="w-2.5 h-2.5 rounded-sm bg-[#FF8C00]" />
+                <span>Unique Thermal Sources</span>
+              </div>
+            </>
+          ) : (
+            CLASSIFICATION_TYPES.map((cat) => (
+              <div key={cat} className="flex items-center gap-1.5 text-[9px] text-[#8B9BB4] font-medium">
+                <span
+                  className="w-2.5 h-2.5 rounded-sm shrink-0"
+                  style={{ backgroundColor: HOTSPOT_COLORS[cat] }}
+                />
+                <span>{CLASSIFICATION_DISPLAY_LABELS[cat]}</span>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Compact Segmented Toggle */}
+        <div className="flex items-center bg-[#06090F] border border-[#1E2D45] rounded-lg p-0.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setMode('activity')}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+              mode === 'activity'
+                ? 'bg-[#1E2D45] text-[#E8EDF5] border border-[#2D3F5E] shadow-sm'
+                : 'text-[#5A7090] hover:text-[#94A3B8]'
+            }`}
+          >
+            <Activity className="w-3 h-3" />
+            <span>Activity</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('classification')}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+              mode === 'classification'
+                ? 'bg-[#1E2D45] text-[#E8EDF5] border border-[#2D3F5E] shadow-sm'
+                : 'text-[#5A7090] hover:text-[#94A3B8]'
+            }`}
+          >
+            <BrainCircuit className="w-3 h-3" />
+            <span>Classification</span>
+          </button>
         </div>
       </div>
 
-      {/* Expanded 7-Day Stacked Bar Chart */}
-      <div className="flex-1 relative flex items-end justify-between px-1.5 sm:px-4 pt-2 sm:pt-3 pb-0.5 gap-1 sm:gap-3 md:gap-6 bg-[#0D121F] rounded-lg border border-[#1e293b] overflow-x-auto custom-scrollbar">
-        {/* Subtle Horizontal Grid lines */}
-        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none p-2 opacity-15">
-          <div className="border-b border-[#2D7DD2] w-full" />
-          <div className="border-b border-[#2D7DD2] w-full" />
-          <div className="border-b border-[#2D7DD2] w-full" />
-        </div>
-
+      {/* ── CHART AREA ─────────────────────────────────────────────────── */}
+      <div className="flex-1 min-h-0 flex items-end gap-2 px-3 pt-1.5 pb-1 w-full overflow-x-auto custom-scrollbar">
         {dates.map((d) => {
           const isSelected = d.isoDate === selectedDate;
-          const total = d.total || 1; // Total FIRMS Detections in sync with Legend panel
-          const barHeightPct = Math.max(18, Math.min((total / maxTotal) * 100, 92));
+          const totalVal = d.total || 0;
+          const uniqueVal = d.uniqueSources || 0;
+
+          const totalHeightPct = Math.max(6, Math.min((totalVal / maxVal) * 100, 100));
+          const uniqueHeightPct = Math.max(6, Math.min((uniqueVal / maxVal) * 100, 100));
 
           return (
             <button
               key={d.isoDate}
               type="button"
               onClick={() => setSelectedDate(d.isoDate)}
-              className="flex-1 min-w-[36px] flex flex-col items-center group cursor-pointer h-full justify-end z-10 transition-transform active:scale-95"
+              className={`flex-1 min-w-[60px] flex flex-col items-center group cursor-pointer h-full justify-end z-10 transition-all rounded-lg p-1.5 ${
+                isSelected ? 'bg-[rgba(255,68,68,0.08)] ring-1 ring-[#FF4444]/40' : 'hover:bg-[#080C14]/60'
+              }`}
+              aria-label={`Select date ${d.label}${d.isToday ? ' (Today)' : ''}`}
             >
-              {/* FIRMS Detection Total Badge */}
-              <span
-                className="text-[8.5px] sm:text-[9px] font-mono font-bold mb-0.5 sm:mb-1 transition-colors"
-                style={{ color: isSelected ? '#2D7DD2' : '#6B7280' }}
-              >
-                {d.total}
-              </span>
-
-              {/* Stacked Bar Container */}
-              <div
-                className="w-full max-w-[36px] sm:max-w-[48px] lg:max-w-[56px] rounded-t-md flex flex-col-reverse overflow-hidden transition-all duration-200 group-hover:brightness-110"
-                style={{
-                  height: `${barHeightPct}%`,
-                  border: isSelected ? '2px solid #2D7DD2' : '1px solid #1e293b',
-                  boxShadow: isSelected ? '0 0 14px rgba(45,125,210,0.7)' : 'none',
-                }}
-              >
-                <div
-                  className="w-full transition-all duration-500 rounded-t-sm"
-                  style={{
-                    height: total > 0 ? `${(d.counts.industrial_thermal_source / total) * 100}%` : '0%',
-                    backgroundColor: HOTSPOT_COLORS.industrial_thermal_source,
-                  }}
-                />
-                <div
-                  className="w-full transition-all duration-500"
-                  style={{
-                    height: total > 0 ? `${(d.counts.mining_thermal_source / total) * 100}%` : '0%',
-                    backgroundColor: HOTSPOT_COLORS.mining_thermal_source,
-                  }}
-                />
-                <div
-                  className="w-full transition-all duration-500"
-                  style={{
-                    height: total > 0 ? `${(d.counts.natural_fire / total) * 100}%` : '0%',
-                    backgroundColor: HOTSPOT_COLORS.natural_fire,
-                  }}
-                />
-                <div
-                  className="w-full transition-all duration-500"
-                  style={{
-                    height: total > 0 ? `${(d.counts.unknown / total) * 100}%` : '0%',
-                    backgroundColor: HOTSPOT_COLORS.unknown,
-                  }}
-                />
+              {/* Metric counts label above bar */}
+              <div className="flex items-center gap-1 mb-1 font-mono text-[10px] shrink-0">
+                {mode === 'activity' ? (
+                  <>
+                    <span className="font-bold text-[#FF4444]">{totalVal}</span>
+                    <span className="text-[#5A7090]">/</span>
+                    <span className="font-bold text-[#FF8C00]">{uniqueVal}</span>
+                  </>
+                ) : (
+                  <span className="font-bold text-[#E8EDF5]">{totalVal}</span>
+                )}
               </div>
 
-              {/* Date Button Base Label */}
+              {/* Bar container consuming full flexible height */}
+              <div className="relative w-full flex-1 min-h-0 flex items-end justify-center gap-1.5 px-1 py-0.5">
+                {mode === 'activity' ? (
+                  /* Activity Mode: Side-by-side bars for FIRMS Detections & Unique Sources */
+                  <>
+                    {/* FIRMS Detections Bar */}
+                    <div className="flex-1 max-w-[32px] h-full flex items-end justify-center">
+                      <div
+                        className="w-full rounded-t-[4px] bg-[#FF4444] opacity-85 group-hover:opacity-100 transition-all duration-200 shadow-sm"
+                        style={{ height: `${totalHeightPct}%` }}
+                        title={`FIRMS Detections: ${totalVal}`}
+                      />
+                    </div>
+
+                    {/* Unique Thermal Sources Bar */}
+                    <div className="flex-1 max-w-[32px] h-full flex items-end justify-center">
+                      <div
+                        className="w-full rounded-t-[4px] bg-[#FF8C00] opacity-85 group-hover:opacity-100 transition-all duration-200 shadow-sm"
+                        style={{ height: `${uniqueHeightPct}%` }}
+                        title={`Unique Sources: ${uniqueVal}`}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  /* Classification Mode: Stacked bar showing ML distribution */
+                  <div className="w-full max-w-[64px] h-full flex items-end justify-center">
+                    <div
+                      className="w-full rounded-t-[4px] overflow-hidden flex flex-col-reverse transition-all duration-200 shadow-sm"
+                      style={{ height: `${totalHeightPct}%` }}
+                    >
+                      {totalVal > 0 ? (
+                        CLASSIFICATION_TYPES.map((cat) => {
+                          const count = d.counts[cat] || 0;
+                          if (count === 0) return null;
+                          const pct = (count / totalVal) * 100;
+                          return (
+                            <div
+                              key={cat}
+                              style={{
+                                height: `${pct}%`,
+                                backgroundColor: HOTSPOT_COLORS[cat],
+                              }}
+                              title={`${CLASSIFICATION_DISPLAY_LABELS[cat]}: ${count}`}
+                            />
+                          );
+                        })
+                      ) : (
+                        <div className="w-full h-full bg-[#1E2D45]" />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Date label */}
               <div
-                className={`text-[8.5px] sm:text-[10px] mt-1 font-mono px-1 sm:px-2 py-0.5 rounded-md transition-all whitespace-nowrap ${
+                className={`text-[10px] mt-1 font-mono px-2 py-0.5 rounded transition-all whitespace-nowrap shrink-0 ${
                   isSelected
-                    ? 'text-white font-bold bg-[#2D7DD2] shadow-md ring-2 ring-[rgba(45,125,210,0.4)]'
-                    : 'text-[#8B9BB4] group-hover:text-[#E8EDF5] bg-[#111827]'
+                    ? 'text-[#E8EDF5] font-bold bg-[#1E2D45]'
+                    : 'text-[#5A7090] group-hover:text-[#94A3B8]'
                 }`}
               >
-                {d.label} <span className="hidden sm:inline">{d.isToday ? '(Today)' : ''}</span>
+                {d.label}{d.isToday ? ' ·' : ''}
               </div>
             </button>
           );
         })}
+
+        {dates.length === 0 && (
+          <div className="flex-1 flex items-center justify-center text-[10px] text-[#5A7090]">
+            Loading activity data…
+          </div>
+        )}
+      </div>
+
+      {/* ── MOBILE LEGEND FOOTER (< lg) ─────────────────────────────────── */}
+      <div className="lg:hidden flex items-center justify-center gap-3 px-3 py-1 border-t border-[#111A26] shrink-0 flex-wrap">
+        {mode === 'activity' ? (
+          <>
+            <div className="flex items-center gap-1 text-[8px] text-[#8B9BB4]">
+              <span className="w-2 h-2 rounded-sm bg-[#FF4444]" />
+              <span>FIRMS Detections</span>
+            </div>
+            <div className="flex items-center gap-1 text-[8px] text-[#8B9BB4]">
+              <span className="w-2 h-2 rounded-sm bg-[#FF8C00]" />
+              <span>Unique Thermal Sources</span>
+            </div>
+          </>
+        ) : (
+          CLASSIFICATION_TYPES.map((cat) => (
+            <div key={cat} className="flex items-center gap-1 text-[8px] text-[#8B9BB4]">
+              <span
+                className="w-2 h-2 rounded-sm shrink-0"
+                style={{ backgroundColor: HOTSPOT_COLORS[cat] }}
+              />
+              <span>{CLASSIFICATION_DISPLAY_LABELS[cat]}</span>
+            </div>
+          ))
+        )}
       </div>
     </footer>
   );

@@ -1,45 +1,36 @@
 # ThermalTrace
 **AI-Powered Geospatial Thermal Intelligence**
 
-ThermalTrace is a full-stack platform for detecting, classifying, analyzing, and monitoring industrial thermal anomalies across India using satellite data, machine learning (XGBoost), and AI intelligence (Google Gemini).
+ThermalTrace is a full-stack platform for detecting, classifying, analyzing, and monitoring industrial thermal anomalies across India using satellite telemetry (NASA FIRMS), machine learning (XGBoost), and AI intelligence.
 
 ---
 
-## 🏗️ Stack Overview
+## 🏗️ Production Architecture
 
-- **Frontend**: React 18, Vite, TypeScript, MapLibre GL JS (served via Nginx on port 5173)
-- **Backend**: FastAPI, Python 3.14 / 3.12, SQLAlchemy Async, Uvicorn (port 8000)
-- **Database**: Supabase PostgreSQL + PostGIS (remote hosted single source of truth)
-- **Infrastructure**: Redis 7 (rate limiting, AI quotas, analytics cache, FIRMS distributed lock)
-- **Machine Learning**: Frozen XGBoost v1 1M v2 model (`xgboost_v1_1m_v2.joblib`)
-- **AI Intelligence**: Google Gemini provider with read-only database tools
+```
+React 18 + TypeScript + MapLibre GL JS (:5173)
+                   │
+                   ▼
+Express / Node.js Primary Backend (:8080)
+   ├── PostgreSQL / PostGIS (Database & Spatial Queries)
+   ├── Redis 7 (Caching, FIRMS Locks, Rate Limiting)
+   ├── NASA FIRMS 6-Hour Background Sync Scheduler
+   └── Python ML Inference Service (:8001)
+             │
+             ▼
+   thermalwatch_model.joblib (8-feature XGBoost)
+```
 
 ---
 
-## 🚀 Running ThermalTrace Locally (Non-Docker Development)
+## 🚀 Component Stack Overview
 
-### 1. Prerequisites
-- Python 3.11+ / 3.14
-- Node.js 18+
-- Redis Server (`redis-server` running on `localhost:6379`)
-
-### 2. Backend Setup
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env # Configure DATABASE_URL, OPENROUTER_API_KEY, FIRMS_MAP_KEY
-uvicorn app.main:app --reload --port 8000
-```
-
-### 3. Frontend Setup
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+- **Frontend**: React 18, Vite, TypeScript, MapLibre GL JS (port 5173)
+- **Primary Backend**: Node.js, Express, TypeScript (port 8080)
+- **ML Service**: Python 3.11, FastAPI, XGBoost (`thermalwatch_model.joblib`) (port 8001)
+- **Database**: PostgreSQL + PostGIS (Supabase / Remote PostGIS)
+- **Cache & Locks**: Redis 7 (rate limiting, analytics cache, FIRMS distributed lock)
+- **AI Intelligence**: Native Express multi-turn LLM Provider with PostgreSQL database tools
 
 ---
 
@@ -50,33 +41,66 @@ Create a root `.env` file from `.env.example`:
 ```bash
 cp .env.example .env
 ```
-Fill in your `DATABASE_URL`, `OPENROUTER_API_KEY`, and `FIRMS_MAP_KEY`.
+Ensure `DATABASE_URL`, `FIRMS_MAP_KEY`, and optional `GEMINI_API_KEY` / `OPENROUTER_API_KEY` are configured.
 
-### 2. Build & Launch Containers
+### 2. Build & Launch Stack
 ```bash
 docker compose build
 docker compose up -d
 ```
 
 ### 3. Service Endpoints
-- **Frontend**: [http://localhost:5173](http://localhost:5173)
-- **Backend API**: [http://localhost:8000](http://localhost:8000)
-- **API Health Check**: [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health)
+- **Frontend App**: [http://localhost:5173](http://localhost:5173)
+- **Express Backend API**: [http://localhost:8080/api/v1](http://localhost:8080/api/v1)
+- **Express Health Check**: [http://localhost:8080/api/v1/health](http://localhost:8080/api/v1/health)
+- **Python ML Service Health**: [http://localhost:8001/health](http://localhost:8001/health)
 
 ---
 
-## 🧪 Testing & Verification
+## 💻 Running ThermalTrace Locally (Non-Docker)
 
-### Backend Pytest Suite
+### 1. Prerequisites
+- Node.js 18+
+- Python 3.11+
+- Redis Server (`redis-server` running on `localhost:6379`)
+
+### 2. Launch Services
 ```bash
-cd backend
-source venv/bin/activate
-pytest tests/
+# 1. Start Python ML Service (port 8001)
+cd ml-service
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8001
+
+# 2. Start Express Backend (port 8080)
+cd backend-node
+npm install
+npm run build && npm start
+
+# 3. Start React Frontend (port 5173)
+cd frontend
+npm install
+npm run dev
 ```
 
-### Frontend TypeScript & Production Build
+---
+
+## 🧪 Testing & Validation
+
+### Express Backend Test Suite
+```bash
+cd backend-node
+npm test
+```
+
+### Python ML Service Pytest Suite
+```bash
+cd ml-service
+PYTHONPATH=. pytest
+```
+
+### Frontend Typecheck & Build
 ```bash
 cd frontend
-npx tsc --noEmit
 npm run build
 ```

@@ -1,7 +1,7 @@
 /**
  * Shared axios instance for ThermalTrace API.
  * In production builds, VITE_API_URL is strictly required.
- * Localhost fallback (http://localhost:8000) applies exclusively in local development mode.
+ * Localhost fallback (http://localhost:8080) applies exclusively in local development mode.
  */
 import axios from 'axios';
 
@@ -10,7 +10,7 @@ const envApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_
 let rawApiUrl = envApiUrl;
 if (!rawApiUrl) {
   if (import.meta.env.DEV) {
-    rawApiUrl = 'http://localhost:8000';
+    rawApiUrl = 'http://localhost:8080';
   } else {
     throw new Error('VITE_API_URL environment variable is required for production builds.');
   }

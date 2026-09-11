@@ -1,136 +1,166 @@
 import React, { useMemo, useState } from 'react';
-import { X, Flame, Building2, History } from 'lucide-react';
+import { X, Flame, Building2, Compass, MapPin, Clock, Activity, Eye, Info } from 'lucide-react';
 import { useMapStore } from '../store/mapStore';
 import { useHotspotsQuery } from '../services/queries/useHotspotsQuery';
 import { useFacilitiesQuery } from '../services/queries/useFacilitiesQuery';
-import { HOTSPOT_LABELS, HOTSPOT_COLORS } from '../types/hotspot';
-import type { Severity, HotspotType } from '../types/hotspot';
+import {
+  HOTSPOT_LABELS,
+  HOTSPOT_SUB_LABELS,
+  HOTSPOT_COLORS,
+  ACTIVITY_STATUS_LABELS,
+  ACTIVITY_STATUS_COLORS,
+} from '../types/hotspot';
+import type { HotspotType, ActivityStatus, Severity } from '../types/hotspot';
 import { FACILITY_LABELS } from '../types/facility';
 import type { FacilityType } from '../types/facility';
 import type { Hotspot } from '../types/hotspot';
 import type { Facility } from '../types/facility';
 import { getDistance } from '../utils/geo';
 
-function getDotColor(item: Hotspot): string {
-  const displayType = item.mlType || item.type;
-  if (displayType && displayType !== 'unknown' && HOTSPOT_COLORS[displayType as HotspotType]) {
-    return HOTSPOT_COLORS[displayType as HotspotType];
-  }
-  const severityColors: Record<Severity, string> = {
-    low: '#10B981',      // Easy / Green
-    medium: '#F59E0B',   // Medium / Yellow
-    high: '#F97316',     // High / Orange
-    critical: '#FF5500', // Critical / Red-Orange
-  };
-  return severityColors[item.severity] || '#F59E0B';
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatDetected(ts: string | undefined): string {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  return `${date}, ${time}`;
 }
 
-function SeverityBadge({ severity, compact = false }: { severity: Severity; compact?: boolean }) {
-  const config: Record<
-    Severity,
-    { bg: string; text: string; border: string; animate: string; label: string }
-  > = {
-    low: {
-      bg: 'rgba(16, 185, 129, 0.22)',
-      text: '#34D399',
-      border: 'rgba(16, 185, 129, 0.5)',
-      animate: '',
-      label: 'EASY',
-    },
-    medium: {
-      bg: 'rgba(245, 158, 11, 0.22)',
-      text: '#FBBF24',
-      border: 'rgba(245, 158, 11, 0.5)',
-      animate: '',
-      label: 'MEDIUM',
-    },
-    high: {
-      bg: 'rgba(249, 115, 22, 0.25)',
-      text: '#FB923C',
-      border: 'rgba(249, 115, 22, 0.6)',
-      animate: '',
-      label: 'HIGH',
-    },
-    critical: {
-      bg: 'rgba(249, 115, 22, 0.35)',
-      text: '#FF7700',
-      border: '#FF6B00',
-      animate: 'animate-pop-in-out',
-      label: 'CRITICAL',
-    },
-  };
+function getDotColor(h: Hotspot): string {
+  const t = (h.mlType || h.type) as HotspotType;
+  return HOTSPOT_COLORS[t] || '#64748B';
+}
 
-  const s = config[severity] || config.low;
+// ─── Badges ──────────────────────────────────────────────────────────────────
 
+function ActivityBadge({ status }: { status?: ActivityStatus }) {
+  const st = status || 'new';
+  const label = ACTIVITY_STATUS_LABELS[st];
+  const color = ACTIVITY_STATUS_COLORS[st];
   return (
     <span
-      className={`font-mono font-bold uppercase rounded border shrink-0 transition-all ${s.animate} ${
-        compact ? 'text-[8px] px-1.5 py-0.5' : 'text-[9px] px-2.5 py-0.5 tracking-wider'
-      }`}
-      style={{
-        backgroundColor: s.bg,
-        color: s.text,
-        borderColor: s.border,
-      }}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border"
+      style={{ backgroundColor: `${color}18`, color, borderColor: `${color}35` }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+      {label}
+    </span>
+  );
+}
+
+function SeverityBadge({ severity }: { severity: Severity }) {
+  const cfg: Record<Severity, { bg: string; text: string; border: string; label: string }> = {
+    low: { bg: 'rgba(16,185,129,0.15)', text: '#34D399', border: 'rgba(16,185,129,0.4)', label: 'LOW' },
+    medium: { bg: 'rgba(245,158,11,0.15)', text: '#FBBF24', border: 'rgba(245,158,11,0.4)', label: 'MED' },
+    high: { bg: 'rgba(249,115,22,0.15)', text: '#FB923C', border: 'rgba(249,115,22,0.4)', label: 'HIGH' },
+    critical: { bg: 'rgba(239,68,68,0.2)', text: '#F87171', border: '#EF4444', label: 'CRIT' },
+  };
+  const s = cfg[severity] || cfg.low;
+  return (
+    <span
+      className="text-[8px] font-mono font-bold uppercase rounded border px-1.5 py-0.5"
+      style={{ backgroundColor: s.bg, color: s.text, borderColor: s.border }}
     >
       {s.label}
     </span>
   );
 }
 
-function formatDetected(ts: string): string {
-  const d = new Date(ts);
-  const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  return `${date}, ${time}`;
+// ─── Stat Row ─────────────────────────────────────────────────────────────────
+
+function StatRow({
+  icon,
+  label,
+  value,
+  valueColor,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  valueColor?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between py-1.5 border-b border-[#0E1825] last:border-0">
+      <div className="flex items-center gap-2 text-[#4A5D78]">
+        {icon}
+        <span className="text-[10px] text-[#5A7090]">{label}</span>
+      </div>
+      <span
+        className="text-[11px] font-mono font-semibold text-right"
+        style={{ color: valueColor || '#C8D4E3' }}
+      >
+        {value}
+      </span>
+    </div>
+  );
 }
+
+// ─── Tab Button ───────────────────────────────────────────────────────────────
+
+function Tab({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`pb-1.5 text-xs font-medium transition-colors cursor-pointer border-b-2 ${
+        active
+          ? 'text-[#2D7DD2] border-[#2D7DD2]'
+          : 'text-[#3B5070] border-transparent hover:text-[#7A8FA8]'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+type ActiveTab = 'overview' | 'infrastructure' | 'history';
 
 export default function RightPanel(): React.JSX.Element | null {
   const selectedHotspotId = useMapStore((s) => s.selectedHotspotId);
   const selectedFacilityId = useMapStore((s) => s.selectedFacilityId);
   const selectHotspot = useMapStore((s) => s.selectHotspot);
   const selectFacility = useMapStore((s) => s.selectFacility);
-
-  const [activeTab, setActiveTab] = useState<'overview' | 'explanation' | 'historical'>('overview');
-
   const minimumConfidence = useMapStore((s) => s.minimumConfidence);
   const selectedDate = useMapStore((s) => s.selectedDate);
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
 
   const { data: hotspots } = useHotspotsQuery(selectedDate, minimumConfidence);
   const { data: facilities } = useFacilitiesQuery();
 
-  // Find most critical hotspot dynamically from NASA FIRMS dataset for default state
-  const mostCriticalHotspot = useMemo<Hotspot | null>(() => {
+  const isUserSelected = selectedHotspotId !== null || selectedFacilityId !== null;
+
+  // ── Resolve active hotspot ──────────────────────────────────────────────
+  const mostCritical = useMemo<Hotspot | null>(() => {
     if (!hotspots || hotspots.length === 0) return null;
-    const severityRank: Record<string, number> = {
-      critical: 4,
-      high: 3,
-      medium: 2,
-      low: 1,
-    };
+    const rank: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
     return (
       [...hotspots].sort((a, b) => {
-        const rankA = severityRank[a.severity] || 0;
-        const rankB = severityRank[b.severity] || 0;
-        if (rankB !== rankA) return rankB - rankA;
-        if (b.brightness !== a.brightness) return b.brightness - a.brightness;
-        return b.confidence - a.confidence;
+        if ((rank[b.severity] || 0) !== (rank[a.severity] || 0))
+          return (rank[b.severity] || 0) - (rank[a.severity] || 0);
+        return b.brightness - a.brightness;
       })[0] || null
     );
   }, [hotspots]);
 
-  // Selected or default active hotspot
   const activeHotspot = useMemo<Hotspot | null>(() => {
     if (selectedHotspotId && hotspots) {
       return hotspots.find((h) => h.id === selectedHotspotId) ?? null;
     }
-    if (!selectedFacilityId) {
-      return mostCriticalHotspot;
-    }
+    if (!selectedFacilityId) return mostCritical;
     return null;
-  }, [selectedHotspotId, selectedFacilityId, hotspots, mostCriticalHotspot]);
-
-  const isUserSelected = selectedHotspotId !== null || selectedFacilityId !== null;
+  }, [selectedHotspotId, selectedFacilityId, hotspots, mostCritical]);
 
   const selectedFacility = useMemo<Facility | null>(() => {
     if (!selectedFacilityId || !facilities) return null;
@@ -152,18 +182,17 @@ export default function RightPanel(): React.JSX.Element | null {
     );
   }, [activeHotspot, relatedFacility]);
 
-  // Detection History showing 5-7 compact readable chronological records
-  const detectionHistory = useMemo<Hotspot[]>(() => {
+  const nearbyHistory = useMemo<Hotspot[]>(() => {
     if (!activeHotspot || !hotspots) return [];
     return hotspots
       .filter(
-        (h: Hotspot) =>
+        (h) =>
           h.id !== activeHotspot.id &&
           (h.facilityId === activeHotspot.facilityId ||
             getDistance(h.latitude, h.longitude, activeHotspot.latitude, activeHotspot.longitude) < 25),
       )
-      .sort((a: Hotspot, b: Hotspot) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, 7);
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 8);
   }, [activeHotspot, hotspots]);
 
   const handleClose = () => {
@@ -171,44 +200,61 @@ export default function RightPanel(): React.JSX.Element | null {
     selectFacility(null);
   };
 
-  const CloseBtn = () =>
-    isUserSelected ? (
-      <button
-        type="button"
-        aria-label="Deselect item"
-        onClick={handleClose}
-        className="text-[#6B7280] hover:text-[#E8EDF5] p-1 rounded transition-colors cursor-pointer hover:bg-[#1E2D45]"
-      >
-        <X className="w-3.5 h-3.5" />
-      </button>
-    ) : null;
+  // ── Panel Header ──────────────────────────────────────────────────────────
+  const PanelHeader = ({
+    title,
+    subtitle,
+    showClose,
+  }: {
+    title: string;
+    subtitle?: string;
+    showClose?: boolean;
+  }) => (
+    <div className="px-4 py-2.5 border-b border-[#111A26] shrink-0 bg-[#06090F] flex items-center justify-between">
+      <div>
+        <span className="text-[9px] font-bold tracking-widest text-[#3B5070] uppercase">
+          {title}
+        </span>
+        {subtitle && (
+          <p className="text-[10px] text-[#4A5D78] mt-0.5">{subtitle}</p>
+        )}
+      </div>
+      {showClose && (
+        <button
+          type="button"
+          aria-label="Deselect"
+          onClick={handleClose}
+          className="text-[#2A3D55] hover:text-[#7A8FA8] p-1 rounded transition-colors cursor-pointer hover:bg-[#0F1A2B]"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
 
-  // ─── LOADING / NO DATA FALLBACK STATE ──────────────────────────────────────
+  // ── Empty / No selection state ─────────────────────────────────────────────
   if (!activeHotspot && !selectedFacility) {
     return (
-      <aside className="w-full h-full flex flex-col bg-[#0D121F] overflow-hidden select-none border-l border-[#1e293b]">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e293b] shrink-0 bg-[#090D16]">
-          <span className="text-[11px] font-bold tracking-widest text-[#E8EDF5] uppercase">
-            INTELLIGENCE PANEL
-          </span>
-          <span className="text-[9px] font-mono text-[#6B7280] bg-[#162033] px-1.5 py-0.5 rounded">
-            SYNCING
-          </span>
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-12 h-12 rounded-full bg-[#162033] border border-[#1e293b] flex items-center justify-center mb-3">
-            <Flame className="w-6 h-6 text-[#2D7DD2] animate-pulse" />
+      <aside className="w-full h-full flex flex-col bg-[#080C14] overflow-hidden select-none border-l border-[#111A26]">
+        <PanelHeader title="Intelligence Panel" />
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-[#0C1520] border border-[#1A2535] flex items-center justify-center">
+            <MapPin className="w-5 h-5 text-[#2D7DD2]" />
           </div>
-          <h3 className="text-xs font-bold text-[#E8EDF5] mb-1">Loading FIRMS Telemetry</h3>
-          <p className="text-[11px] text-[#6B7280] leading-relaxed max-w-[220px]">
-            Fetching latest thermal anomalies and FIRMS telemetry...
-          </p>
+          <div>
+            <p className="text-sm font-semibold text-[#7A8FA8] leading-snug">
+              Select a thermal source
+            </p>
+            <p className="text-[11px] text-[#3B4D63] mt-1 leading-relaxed max-w-[200px]">
+              Click any point on the map to inspect its activity, classification, and nearby infrastructure.
+            </p>
+          </div>
         </div>
       </aside>
     );
   }
 
-  // ─── SELECTED FACILITY STATE ───────────────────────────────────────────────
+  // ── Facility selected ──────────────────────────────────────────────────────
   if (selectedFacility) {
     const nearbyHotspots = hotspots
       ? hotspots.filter(
@@ -219,24 +265,22 @@ export default function RightPanel(): React.JSX.Element | null {
       : [];
 
     return (
-      <aside className="w-full h-full flex flex-col bg-[#0D121F] overflow-hidden select-none border-l border-[#1e293b]">
-        <div className="px-4 py-3 border-b border-[#1e293b] shrink-0 bg-[#090D16]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">
-              SELECTED FACILITY
-            </span>
-            <CloseBtn />
-          </div>
+      <aside className="w-full h-full flex flex-col bg-[#080C14] overflow-hidden select-none border-l border-[#111A26]">
+        <PanelHeader title="Selected Facility" showClose />
+
+        <div className="px-4 py-3 border-b border-[#111A26] shrink-0">
           <div className="flex items-start gap-2.5">
-            <Building2 className="w-4 h-4 text-[#2D7DD2] mt-0.5 shrink-0" />
+            <div className="w-8 h-8 rounded-lg bg-[#0C1A2E] border border-[#1A2D47] flex items-center justify-center shrink-0 mt-0.5">
+              <Building2 className="w-4 h-4 text-[#2D7DD2]" />
+            </div>
             <div>
-              <h2 className="text-[14px] font-bold text-[#E8EDF5] leading-snug">
+              <h2 className="text-sm font-bold text-[#D0DAE8] leading-snug">
                 {selectedFacility.name}
               </h2>
-              <p className="text-[11px] text-[#9CA3AF] mt-0.5">
+              <p className="text-[11px] text-[#5A7090] mt-0.5">
                 {selectedFacility.city}, {selectedFacility.state}
               </p>
-              <p className="font-mono text-[9px] text-[#6B7280] mt-1">
+              <p className="font-mono text-[9px] text-[#3B4D63] mt-1">
                 {selectedFacility.latitude.toFixed(4)}°N, {selectedFacility.longitude.toFixed(4)}°E
               </p>
             </div>
@@ -244,38 +288,44 @@ export default function RightPanel(): React.JSX.Element | null {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className="bg-[#162032] p-3 rounded-lg border border-[#1e293b]">
-              <span className="text-[9px] font-bold text-[#6B7280] uppercase tracking-wider block mb-1">TYPE</span>
-              <span className="text-xs font-semibold text-[#E8EDF5]">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-[#0C1520] p-2.5 rounded-lg border border-[#111A26]">
+              <span className="text-[8px] font-bold text-[#3B5070] uppercase block mb-1">Type</span>
+              <span className="text-xs font-semibold text-[#C8D4E3]">
                 {FACILITY_LABELS[selectedFacility.type as FacilityType] || 'Industrial'}
               </span>
             </div>
-            <div className="bg-[#162032] p-3 rounded-lg border border-[#1e293b]">
-              <span className="text-[9px] font-bold text-[#6B7280] uppercase tracking-wider block mb-1">NEARBY HOTSPOTS</span>
-              <span className="text-xl font-bold text-[#E8EDF5]">{nearbyHotspots.length}</span>
+            <div className="bg-[#0C1520] p-2.5 rounded-lg border border-[#111A26]">
+              <span className="text-[8px] font-bold text-[#3B5070] uppercase block mb-1">
+                Nearby Detections
+              </span>
+              <span className="text-base font-bold text-[#C8D4E3]">{nearbyHotspots.length}</span>
             </div>
           </div>
 
           {nearbyHotspots.length > 0 && (
-            <div className="pt-3 border-t border-[#1e293b]">
-              <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider block mb-2">ASSOCIATED DETECTIONS</span>
-              <div className="space-y-2">
+            <div>
+              <span className="text-[9px] font-bold text-[#3B5070] uppercase tracking-wider block mb-2">
+                Associated Detections
+              </span>
+              <div className="space-y-1.5">
                 {nearbyHotspots.slice(0, 6).map((h) => (
                   <button
                     key={h.id}
                     type="button"
                     onClick={() => selectHotspot(h.id)}
-                    className="w-full flex items-center justify-between px-3 py-2 bg-[#162032] border border-[#1e293b] rounded-lg hover:bg-[#1E2D45] transition-colors cursor-pointer text-left"
+                    className="w-full flex items-center justify-between px-3 py-2 bg-[#0C1520] border border-[#111A26] rounded-lg hover:bg-[#0F1D2E] transition-colors cursor-pointer text-left"
                   >
                     <div className="flex items-center gap-2">
                       <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        className="w-2 h-2 rounded-full shrink-0"
                         style={{ backgroundColor: getDotColor(h) }}
                       />
-                      <span className="text-[11px] text-[#9CA3AF]">{HOTSPOT_LABELS[(h.mlType || h.type) as HotspotType]}</span>
+                      <span className="text-[10px] text-[#7A8FA8]">
+                        {HOTSPOT_LABELS[(h.mlType || h.type) as HotspotType]}
+                      </span>
                     </div>
-                    <span className="text-[11px] font-mono font-semibold text-[#E8EDF5]">
+                    <span className="text-[10px] font-mono font-semibold text-[#C8D4E3]">
                       {h.brightness} K
                     </span>
                   </button>
@@ -288,376 +338,350 @@ export default function RightPanel(): React.JSX.Element | null {
     );
   }
 
-  // ─── ACTIVE HOTSPOT STATE (USER SELECTED OR DYNAMIC MOST CRITICAL) ────────
   if (!activeHotspot) return null;
 
-  const hotspotLabel = HOTSPOT_LABELS[(activeHotspot.mlType || activeHotspot.type) as HotspotType] || 'Unknown / Unclassified';
+  // ── Hotspot selected ──────────────────────────────────────────────────────
+  const rawType = (activeHotspot.mlType || activeHotspot.type || 'unknown') as HotspotType;
+  const isUnknown = rawType === 'unknown';
+  const typeColor = HOTSPOT_COLORS[rawType];
+  const mlLabel = HOTSPOT_LABELS[rawType];
+  const mlSubLabel = HOTSPOT_SUB_LABELS[rawType];
 
   return (
-    <aside className="w-full h-full flex flex-col bg-[#0D121F] overflow-hidden select-none border-l border-[#1e293b]">
-      {/* Panel Header */}
-      <div className="px-4 py-3.5 border-b border-[#1e293b] shrink-0 bg-[#090D16]">
+    <aside className="w-full h-full flex flex-col bg-[#080C14] overflow-hidden select-none border-l border-[#111A26]">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-[#111A26] shrink-0 bg-[#06090F]">
+        {/* Top row: badges + close */}
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider flex items-center gap-1.5">
-            {isUserSelected ? (
-              'SELECTED HOTSPOT'
-            ) : (
-              <>
-                <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B00] animate-ping" />
-                MOST CRITICAL ANOMALY
-              </>
-            )}
-          </span>
-          <div className="flex items-center gap-2">
+          <ActivityBadge status={activeHotspot.activityStatus} />
+          <div className="flex items-center gap-1.5">
             <SeverityBadge severity={activeHotspot.severity} />
-            <CloseBtn />
+            {isUserSelected && (
+              <button
+                type="button"
+                aria-label="Deselect hotspot"
+                onClick={handleClose}
+                className="text-[#2A3D55] hover:text-[#7A8FA8] p-1 rounded transition-colors cursor-pointer hover:bg-[#0F1A2B]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Title + ML Badge */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded flex items-center justify-center shrink-0 bg-[rgba(255,107,0,0.15)] border border-[rgba(255,107,0,0.3)]">
-            <Flame className="w-4 h-4 text-[#FF6B00]" />
+        {/* Classification block */}
+        <div className="flex items-start gap-2.5">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+            style={{ backgroundColor: `${typeColor}18`, border: `1px solid ${typeColor}35` }}
+          >
+            <Flame className="w-4 h-4" style={{ color: typeColor }} />
           </div>
           <div>
-            <h2 className="text-[14px] font-bold text-[#E8EDF5] leading-tight">
-              {hotspotLabel} <span className="text-[9px] font-normal text-[#6B7280]">(FIRMS Satellite Observation)</span>
-            </h2>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-[9px] font-bold text-[#10B981] bg-[rgba(16,185,129,0.12)] px-1.5 py-0.2 rounded">
-                FIRMS Conf: {activeHotspot.confidence}%
+            <h2 className="text-sm font-bold text-[#D0DAE8] leading-tight">{mlLabel}</h2>
+            <p className="text-[9px] font-mono text-[#4A5D78] mt-0.5">{mlSubLabel}</p>
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <span className="text-[8px] font-bold text-[#10B981] bg-[rgba(16,185,129,0.12)] px-1.5 py-0.5 rounded border border-[rgba(16,185,129,0.2)]">
+                FIRMS {activeHotspot.confidence}%
               </span>
-              {!isUserSelected && (
-                <span className="text-[8px] font-mono text-[#F59E0B] bg-[rgba(245,158,11,0.12)] px-1.5 py-0.2 rounded">
-                  Auto-Selected
+              {activeHotspot.mlConfidence != null && (
+                <span className="text-[8px] font-mono text-[#38BDF8] bg-[rgba(56,189,248,0.1)] px-1.5 py-0.5 rounded border border-[rgba(56,189,248,0.2)]">
+                  ML {(activeHotspot.mlConfidence * 100).toFixed(0)}%
                 </span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Subtabs: Overview | Explanation | Historical */}
-        <div className="flex items-center gap-4 mt-3 pt-2.5 border-t border-[#1e293b] text-xs font-medium">
-          <button
-            type="button"
-            onClick={() => setActiveTab('overview')}
-            className={`pb-1 transition-colors cursor-pointer ${
-              activeTab === 'overview'
-                ? 'text-[#2D7DD2] font-bold border-b-2 border-[#2D7DD2]'
-                : 'text-[#6B7280] hover:text-[#E8EDF5]'
-            }`}
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('explanation')}
-            className={`pb-1 transition-colors cursor-pointer ${
-              activeTab === 'explanation'
-                ? 'text-[#2D7DD2] font-bold border-b-2 border-[#2D7DD2]'
-                : 'text-[#6B7280] hover:text-[#E8EDF5]'
-            }`}
-          >
-            Explanation
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('historical')}
-            className={`pb-1 transition-colors cursor-pointer ${
-              activeTab === 'historical'
-                ? 'text-[#2D7DD2] font-bold border-b-2 border-[#2D7DD2]'
-                : 'text-[#6B7280] hover:text-[#E8EDF5]'
-            }`}
-          >
-            Historical ({detectionHistory.length})
-          </button>
-        </div>
-      </div>
-
-      {/* Panel Body — Scrollable */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
-        {activeTab === 'overview' && (
-          <>
-            {/* 1. Location & Distance */}
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider block">
-                LOCATION & PROXIMITY
-              </span>
-              <div className="grid grid-cols-2 gap-2 bg-[#162032] p-3 rounded-lg border border-[#1e293b]">
-                <div>
-                  <span className="text-[9px] text-[#6B7280] block">STATE / REGION</span>
-                  <p className="text-[11px] font-semibold text-[#E8EDF5] truncate mt-0.5">
-                    {relatedFacility ? `${relatedFacility.city}, ${relatedFacility.state}` : 'India Bounding Box'}
-                  </p>
-                  <p className="text-[9px] font-mono text-[#6B7280] mt-0.5">
-                    {activeHotspot.latitude.toFixed(4)}°N, {activeHotspot.longitude.toFixed(4)}°E
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[9px] text-[#6B7280] block">NEAREST FACILITY</span>
-                  <p className="text-[11px] font-semibold text-[#E8EDF5] truncate mt-0.5">
-                    {facilityDistance !== null ? `${facilityDistance.toFixed(1)} km` : 'N/A'}
-                  </p>
-                  <p className="text-[9px] text-[#6B7280] truncate mt-0.5">
-                    {relatedFacility ? relatedFacility.name : 'No facility within 10km'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. FRP, Brightness & FIRMS Confidence */}
-            <div className="space-y-1.5 pt-3 border-t border-[#1e293b]">
-              <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider block">
-                FIRMS SATELLITE TELEMETRY
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-[#162032] p-2.5 rounded-lg border border-[#1e293b]">
-                  <span className="text-[9px] font-bold text-[#6B7280] uppercase block">FRP</span>
-                  <span className="text-xs font-bold text-[#FF6B00] block mt-0.5">N/A</span>
-                  <span className="text-[8px] text-[#F97316] block mt-0.5">Not tracked</span>
-                </div>
-                <div className="bg-[#162032] p-2.5 rounded-lg border border-[#1e293b]">
-                  <span className="text-[9px] font-bold text-[#6B7280] uppercase block">BRIGHTNESS</span>
-                  <span className="text-xs font-bold text-[#E8EDF5] block mt-0.5">{activeHotspot.brightness} K</span>
-                </div>
-                <div className="bg-[#162032] p-2.5 rounded-lg border border-[#1e293b]">
-                  <span className="text-[9px] font-bold text-[#6B7280] uppercase block">CONFIDENCE</span>
-                  <span className="text-xs font-bold text-[#10B981] block mt-0.5">{activeHotspot.confidence}%</span>
-                  <span className="text-[8px] text-[#10B981] block mt-0.5">High</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Observation Metadata */}
-            <div className="pt-3 border-t border-[#1e293b]">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-[#E8EDF5]">OBSERVATION METADATA</span>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-[#162032] p-2.5 rounded-lg border border-[#1e293b]">
-                  <span className="text-[9px] font-bold text-[#6B7280] uppercase block">SOURCE</span>
-                  <span className="text-xs font-bold text-[#E8EDF5] block mt-0.5">NASA FIRMS NRT</span>
-                </div>
-                <div className="bg-[#162032] p-2.5 rounded-lg border border-[#1e293b]">
-                  <span className="text-[9px] font-bold text-[#6B7280] uppercase block">FIRMS SATELLITE</span>
-                  <span className="text-xs font-bold text-[#E8EDF5] block mt-0.5">VIIRS</span>
-                </div>
-                <div className="bg-[#162032] p-2.5 rounded-lg border border-[#1e293b]">
-                  <span className="text-[9px] font-bold text-[#6B7280] uppercase block">STATUS</span>
-                  <span className="text-xs font-bold text-[#E8EDF5] block mt-0.5">{(activeHotspot as any).status || 'Active'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Land Cover Context (ESA WorldCover 10m) */}
-            {(activeHotspot as any).landCoverName && (
-              <div className="space-y-1.5 pt-3 border-t border-[#1e293b]">
-                <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider block">
-                  LAND COVER CONTEXT
-                </span>
-                <div className="flex items-center gap-2 bg-[#162032] p-2.5 rounded-lg border border-[#1e293b]">
-                  <span
-                    className="w-3 h-3 rounded-full shrink-0 border border-white/20"
-                    style={{
-                      backgroundColor:
-                        (activeHotspot as any).landCoverClass === 10 ? '#006400' :
-                        (activeHotspot as any).landCoverClass === 20 ? '#FFBB22' :
-                        (activeHotspot as any).landCoverClass === 30 ? '#FFFF4C' :
-                        (activeHotspot as any).landCoverClass === 40 ? '#F096FF' :
-                        (activeHotspot as any).landCoverClass === 50 ? '#FA0000' :
-                        (activeHotspot as any).landCoverClass === 60 ? '#B4B4B4' :
-                        (activeHotspot as any).landCoverClass === 70 ? '#F0F0F0' :
-                        (activeHotspot as any).landCoverClass === 80 ? '#0064C8' :
-                        (activeHotspot as any).landCoverClass === 90 ? '#0096A0' :
-                        (activeHotspot as any).landCoverClass === 95 ? '#00CF75' :
-                        '#6B7280'
-                    }}
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-[#E8EDF5] block">
-                      {(activeHotspot as any).landCoverName}
-                    </span>
-                    <span className="text-[9px] text-[#6B7280] block mt-0.5">
-                      ESA WorldCover 2021 • 10m Resolution
-                    </span>
-                  </div>
-                </div>
-                <p className="text-[9px] text-[#6B7280] leading-relaxed">
-                  Satellite-derived land-cover classification provides environmental context for thermal source interpretation.
-                </p>
-              </div>
-            )}
-
-            {/* 6. Detection History Section */}
-            <div className="pt-3 border-t border-[#1e293b] space-y-2">
-              <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider block flex items-center gap-1">
-                <History className="w-3 h-3 text-[#2D7DD2]" /> DETECTION HISTORY ({detectionHistory.length})
-              </span>
-              <div className="space-y-1.5">
-                {detectionHistory.length === 0 ? (
-                  <p className="text-[10px] text-[#6B7280]">No prior detections recorded nearby.</p>
-                ) : (
-                  detectionHistory.map((item: Hotspot) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => selectHotspot(item.id)}
-                      className="w-full flex items-center justify-between px-3 py-2 bg-[#162032] border border-[#1e293b] rounded-lg hover:bg-[#1E2D45] transition-colors cursor-pointer text-left"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: getDotColor(item) }}
-                        />
-                        <span className="font-mono text-[10px] text-[#9CA3AF]">
-                          {formatDetected(item.timestamp)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 font-mono text-[10px]">
-                        <span className="text-[#E8EDF5] font-semibold">{item.brightness} K</span>
-                        <SeverityBadge severity={item.severity} compact />
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {activeTab === 'explanation' && (
-          <div className="space-y-3">
-            <div className="bg-[#162032] p-3.5 rounded-lg border border-[#1e293b]">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-[#3B82F6] uppercase tracking-wider bg-[rgba(59,130,246,0.12)] px-2 py-0.5 rounded">
-                  ML CLASSIFIED ({activeHotspot.modelVersion || 'xgboost-v1'})
-                </span>
-                <span className="text-[11px] font-mono font-bold text-[#10B981]">
-                  ML Conf: {activeHotspot.mlConfidence ? `${(activeHotspot.mlConfidence * 100).toFixed(1)}%` : '89.5%'}
-                </span>
-              </div>
-              <h4 className="text-xs font-bold text-[#E8EDF5] mb-1">
-                {HOTSPOT_LABELS[(activeHotspot.mlType || activeHotspot.type) as HotspotType] || 'Unknown / Unclassified'}
-              </h4>
-              <p className="text-[11px] text-[#9CA3AF] leading-relaxed">
-                Classified by ThermalTrace XGBoost ML model (`thermalwatch-v1`) combining FIRMS thermal characteristics (FRP, brightness), temporal persistence, and OpenStreetMap industrial proximity.
-              </p>
-              <div className="mt-2 p-2 bg-[#090D16] border border-[#1E293B] rounded-md text-[10.5px]">
-                <span className="text-[#38BDF8] font-bold block text-[9.5px] uppercase tracking-wider mb-0.5">
-                  PS CATEGORY COVERAGE
-                </span>
-                <span className="text-[#D1D5DB]">
-                  {activeHotspot.mlType === 'industrial_thermal_source'
-                    ? 'Includes industrial process heat, refineries, power plants & gas flaring stacks.'
-                    : activeHotspot.mlType === 'mining_thermal_source'
-                    ? 'Includes quarries, mineral processing & overburden thermal emissions.'
-                    : activeHotspot.mlType === 'natural_fire'
-                    ? 'Encompasses seasonal wildfires, forest fires, agricultural stubble burning & natural vegetation fires.'
-                    : 'Persistent heat source > 2km from mapped industrial features awaiting field verification.'}
-                </span>
-              </div>
-            </div>
-
-            {/* Feature Contribution Breakdown (SHAP / Feature Importance) */}
-            <div className="bg-[#162032] p-3.5 rounded-lg border border-[#1e293b] space-y-2.5">
-              <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider block">
-                CONTRIBUTING PREDICTIVE FACTORS
-              </span>
-
-              {(() => {
-                let parsedExplanation: Record<string, number> = {
-                  bright_ti4: 0.342,
-                  facility_dist_km: 0.315,
-                  frp: 0.104,
-                  temp_diff: 0.083,
-                  frp_density: 0.051,
-                };
-                if (activeHotspot.mlExplanation) {
-                  try {
-                    if (typeof activeHotspot.mlExplanation === 'string') {
-                      parsedExplanation = JSON.parse(activeHotspot.mlExplanation);
-                    } else {
-                      parsedExplanation = activeHotspot.mlExplanation;
-                    }
-                  } catch (e) {
-                    // Fallback to default
-                  }
-                }
-
-                const featureLabels: Record<string, string> = {
-                  bright_ti4: 'VIIRS Kelvin Brightness (Ti4)',
-                  facility_dist_km: 'Distance to Nearest OSM Industrial Infrastructure',
-                  frp: 'Fire Radiative Power (FRP MW)',
-                  temp_diff: 'Multi-Spectral Radiance (Ti4 - Ti5)',
-                  frp_density: 'FRP to Brightness Density',
-                  confidence_norm: 'FIRMS Detection Confidence',
-                  persistence_count: 'Temporal Persistence Count',
-                  nearest_osm_distance_km: 'Distance to Nearest OSM Industrial Infrastructure',
-                  obs_count: 'Observation Count (Cluster Persistence)',
-                  log_mean_frp: 'Mean Fire Radiative Power (log MW)',
-                  log_std_frp: 'FRP Standard Deviation (log)',
-                  frp_cv: 'FRP Coefficient of Variation',
-                  months_active: 'Months Active',
-                  active_duration_days: 'Active Duration (Days)',
-                  first_seen_month: 'First Seen Month',
-                };
-
-                return (
-                  <div className="space-y-2">
-                    {Object.entries(parsedExplanation).map(([featKey, val]) => {
-                      const pct = Math.round(val * 100);
-                      return (
-                        <div key={featKey} className="space-y-0.5">
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="text-[#9CA3AF] font-medium">
-                              {featureLabels[featKey] || featKey}
-                            </span>
-                            <span className="font-mono text-[#E8EDF5] font-bold">+{pct}%</span>
-                          </div>
-                          <div className="w-full h-1.5 bg-[#090D16] rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-[#2D7DD2] to-[#10B981] rounded-full transition-all duration-300"
-                              style={{ width: `${Math.max(5, Math.min(100, pct))}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div className="p-2.5 bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.2)] rounded-lg text-[10px] text-[#F59E0B] leading-snug">
-              <strong>Scientific Notice</strong>: ML predictions are model-inferred probability classifications, not confirmed physical events. Raw FIRMS thermal observation data from NASA is preserved independently. Satellite imagery provides visual and geographic context for interpretation.
-            </div>
+        {/* Under review note */}
+        {isUnknown && (
+          <div className="mt-2 px-2.5 py-1.5 rounded-lg bg-[rgba(100,116,139,0.1)] border border-[rgba(100,116,139,0.2)] flex items-start gap-1.5">
+            <Info className="w-3 h-3 text-[#64748B] mt-0.5 shrink-0" />
+            <p className="text-[9px] text-[#64748B] leading-relaxed">
+              Insufficient evidence for confident classification. Will update as additional FIRMS passes observe this location.
+            </p>
           </div>
         )}
 
-        {activeTab === 'historical' && (
-          <div className="space-y-2">
-            <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider block">Recent Detection History ({detectionHistory.length})</span>
-            <div className="space-y-2">
-              {detectionHistory.map((item: Hotspot) => (
+        {/* Tabs */}
+        <div className="flex items-center gap-4 mt-3 pt-2 border-t border-[#0E1825]">
+          <Tab label="Overview" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
+          <Tab label="Nearby" active={activeTab === 'infrastructure'} onClick={() => setActiveTab('infrastructure')} />
+          <Tab
+            label={`History${nearbyHistory.length > 0 ? ` (${nearbyHistory.length})` : ''}`}
+            active={activeTab === 'history'}
+            onClick={() => setActiveTab('history')}
+          />
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        {/* ── OVERVIEW TAB ────────────────────────────────────────────────── */}
+        {activeTab === 'overview' && (
+          <div className="p-3 space-y-2.5">
+            {/* 1. THERMAL SIGNAL */}
+            <div className="bg-[#0C1520] rounded-lg border border-[#111A26] p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] font-bold text-[#3B5070] uppercase tracking-wider">
+                  THERMAL SIGNAL
+                </span>
+                <span className="text-[8px] font-mono text-[#EF4444] font-semibold">FIRMS SATELLITE</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <div className="bg-[#080C14] p-2 rounded border border-[#111A26]">
+                  <span className="text-[8px] font-semibold text-[#5A7090] uppercase block mb-0.5">
+                    FRP Intensity
+                  </span>
+                  <span className="text-xs font-mono font-bold text-[#EF4444]">
+                    {activeHotspot.frp ? `${activeHotspot.frp} MW` : '—'}
+                  </span>
+                </div>
+                <div className="bg-[#080C14] p-2 rounded border border-[#111A26]">
+                  <span className="text-[8px] font-semibold text-[#5A7090] uppercase block mb-0.5">
+                    Brightness
+                  </span>
+                  <span className="text-xs font-mono font-bold text-[#F97316]">
+                    {activeHotspot.brightness} K
+                  </span>
+                </div>
+              </div>
+              <StatRow
+                icon={<Eye className="w-3 h-3 text-[#2D7DD2]" />}
+                label="Observation Count"
+                value={`${activeHotspot.sourceObsCount || 1}`}
+              />
+            </div>
+
+            {/* 2. ACTIVITY */}
+            <div className="bg-[#0C1520] rounded-lg border border-[#111A26] p-3">
+              <span className="text-[9px] font-bold text-[#3B5070] uppercase tracking-wider block mb-2">
+                ACTIVITY
+              </span>
+              <StatRow
+                icon={<Clock className="w-3 h-3 text-[#5A7090]" />}
+                label="First Seen"
+                value={formatDetected(activeHotspot.firstSeen || activeHotspot.timestamp)}
+              />
+              <StatRow
+                icon={<Clock className="w-3 h-3 text-[#5A7090]" />}
+                label="Last Seen"
+                value={formatDetected(activeHotspot.lastSeen || activeHotspot.timestamp)}
+              />
+              <StatRow
+                icon={<Activity className="w-3 h-3 text-[#38BDF8]" />}
+                label="Source Persistence"
+                value={
+                  (activeHotspot.sourceObsCount || 1) === 1
+                    ? 'New / Single observation'
+                    : (activeHotspot.sourceObsCount || 1) >= 3
+                    ? 'Persistent Source'
+                    : 'Recurring / Active'
+                }
+                valueColor={(activeHotspot.sourceObsCount || 1) === 1 ? '#38BDF8' : '#F59E0B'}
+              />
+            </div>
+
+            {/* 3. LOCATION */}
+            <div className="bg-[#0C1520] rounded-lg border border-[#111A26] p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[9px] font-bold text-[#3B5070] uppercase tracking-wider">
+                  LOCATION
+                </span>
+                <span className="text-[8px] font-mono text-[#2D7DD2]">EPSG:4326</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-[#080C14] p-2 rounded border border-[#111A26]">
+                  <span className="text-[8px] font-semibold text-[#5A7090] uppercase block mb-0.5">Latitude</span>
+                  <span className="text-[11px] font-mono font-bold text-[#C8D4E3]">
+                    {activeHotspot.latitude.toFixed(5)}°N
+                  </span>
+                </div>
+                <div className="bg-[#080C14] p-2 rounded border border-[#111A26]">
+                  <span className="text-[8px] font-semibold text-[#5A7090] uppercase block mb-0.5">Longitude</span>
+                  <span className="text-[11px] font-mono font-bold text-[#C8D4E3]">
+                    {activeHotspot.longitude.toFixed(5)}°E
+                  </span>
+                </div>
+              </div>
+              {relatedFacility && (
+                <p className="text-[9px] text-[#5A7090] mt-2 border-t border-[#0E1825] pt-1.5">
+                  Near <span className="text-[#C8D4E3] font-semibold">{relatedFacility.name}</span>
+                  {facilityDistance != null && ` (${facilityDistance.toFixed(1)} km)`}
+                </p>
+              )}
+            </div>
+
+            {/* 4. ENVIRONMENT / LAND COVER */}
+            <div className="bg-[#0C1520] rounded-lg border border-[#111A26] p-3">
+              <span className="text-[9px] font-bold text-[#3B5070] uppercase tracking-wider block mb-1.5">
+                ENVIRONMENT / LAND COVER
+              </span>
+              <div className="flex items-center gap-2.5">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-[#10B981] border border-white/10" />
+                <div>
+                  <span className="text-[11px] font-semibold text-[#C8D4E3] block">
+                    {activeHotspot.landCoverName || 'Unknown Land Cover'}
+                  </span>
+                  <span className="text-[8px] text-[#3B4D63] font-mono">
+                    ESA WorldCover 2021 • 10m
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 5. OSM CONTEXT SUMMARY CARD */}
+            {activeHotspot.osmContext && activeHotspot.osmContext.length > 0 && (
+              <div className="bg-[#0C1520] rounded-lg border border-[#111A26] p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[9px] font-bold text-[#38BDF8] uppercase tracking-wider">
+                    OSM CONTEXT
+                  </span>
+                  <span className="text-[8px] font-mono text-[#5A7090]">
+                    {activeHotspot.osmContext[0].distanceKm > 15 ? 'NEAREST MAPPED' : 'LOCAL'}
+                  </span>
+                </div>
+                <div className="bg-[#080C14] p-2 rounded border border-[#111A26] flex items-center justify-between">
+                  <div>
+                    <span className="text-[8px] font-semibold text-[#5A7090] uppercase block">
+                      Nearest Mapped Facility
+                    </span>
+                    <span className="text-xs font-semibold text-[#C8D4E3] block capitalize">
+                      {activeHotspot.osmContext[0].name || activeHotspot.osmContext[0].featureType.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold text-[#38BDF8] bg-[#0C1520] px-2 py-1 rounded border border-[#1E2D45]">
+                    {activeHotspot.osmContext[0].distanceKm.toFixed(1)} km
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* 6. ML V2 MODEL EVIDENCE / EXPLANATION */}
+            {activeHotspot.mlExplanation && (
+              <div className="bg-[#0C1520] rounded-lg border border-[#111A26] p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[9px] font-bold text-[#38BDF8] uppercase tracking-wider">
+                    ML V2 DECISION FACTORS
+                  </span>
+                  <span className="text-[8px] font-mono text-[#5A7090]">
+                    {activeHotspot.modelVersion || 'v2'}
+                  </span>
+                </div>
+                {typeof activeHotspot.mlExplanation === 'object' ? (
+                  <div className="space-y-1">
+                    {Object.entries(activeHotspot.mlExplanation).map(([key, val]) => (
+                      <div key={key} className="flex items-center justify-between text-[10px] py-0.5 border-b border-[#0E1825] last:border-0">
+                        <span className="text-[#5A7090] font-mono">{key.replace(/_/g, ' ')}</span>
+                        <span className="font-mono font-bold text-[#38BDF8]">
+                          {typeof val === 'number' ? val.toFixed(3) : String(val)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-[#7A8FA8] leading-relaxed">
+                    {activeHotspot.mlExplanation}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── NEAREST INFRASTRUCTURE TAB ─────────────────────────────────── */}
+        {activeTab === 'infrastructure' && (
+          <div className="p-3 space-y-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Compass className="w-3.5 h-3.5 text-[#2D7DD2]" />
+              <span className="text-[9.5px] font-bold text-[#D0DAE8] uppercase tracking-wider">
+                NEAREST INFRASTRUCTURE (OSM)
+              </span>
+            </div>
+
+            {activeHotspot.osmContext && activeHotspot.osmContext.length > 0 ? (
+              <div className="space-y-2">
+                {activeHotspot.osmContext.map((osm, idx) => {
+                  const isDistant = osm.distanceKm > 15;
+                  return (
+                    <div
+                      key={osm.id || idx}
+                      className="bg-[#0C1520] p-3 rounded-lg border border-[#111A26] flex flex-col gap-1.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-xs font-bold text-[#E8EDF5] block capitalize">
+                            {osm.name || osm.featureType.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-[9px] font-mono text-[#5A7090] uppercase tracking-wider">
+                            {osm.featureType.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono font-bold text-[#38BDF8] bg-[#080C14] px-2 py-1 rounded border border-[#1E2D45] shrink-0">
+                          {osm.distanceKm.toFixed(1)} km away
+                        </span>
+                      </div>
+
+                      {isDistant && (
+                        <div className="text-[8.5px] font-mono text-[#7A8FA8] bg-[#080C14] px-2 py-1 rounded border border-[#111A26]">
+                          Nearest mapped facility — {osm.distanceKm.toFixed(1)} km away
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <div className="p-2.5 rounded-lg bg-[#06090F] border border-[#111A26]">
+                  <p className="text-[8.5px] text-[#5A7090] italic leading-relaxed">
+                    Nearest mapped feature in available dataset — does not confirm physical ownership or direct association.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[#0C1520] rounded-lg border border-[#111A26] p-6 text-center">
+                <Compass className="w-6 h-6 text-[#2A3D55] mx-auto mb-2" />
+                <p className="text-[11px] font-medium text-[#7A8FA8]">
+                  No mapped infrastructure available.
+                </p>
+                <p className="text-[9px] text-[#4A5D78] mt-1">
+                  No matching feature found in the current OpenStreetMap dataset.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── HISTORY TAB ─────────────────────────────────────────────────── */}
+        {activeTab === 'history' && (
+          <div className="p-3 space-y-1.5">
+            <span className="text-[9px] font-bold text-[#3B5070] uppercase tracking-wider block mb-2">
+              Nearby Detections ({nearbyHistory.length})
+            </span>
+            {nearbyHistory.length === 0 ? (
+              <div className="bg-[#0C1520] rounded-lg border border-[#111A26] p-4 text-center">
+                <p className="text-[10px] text-[#3B4D63]">No prior detections recorded nearby.</p>
+              </div>
+            ) : (
+              nearbyHistory.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => selectHotspot(item.id)}
-                  className="w-full flex items-center justify-between px-3 py-2 bg-[#162032] border border-[#1e293b] rounded-lg hover:bg-[#1E2D45] transition-colors cursor-pointer text-left"
+                  className="w-full flex items-center justify-between px-3 py-2 bg-[#0C1520] border border-[#111A26] rounded-lg hover:bg-[#0F1D2E] transition-colors cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-2">
                     <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      className="w-2 h-2 rounded-full shrink-0"
                       style={{ backgroundColor: getDotColor(item) }}
                     />
-                    <span className="font-mono text-[10px] text-[#9CA3AF]">
+                    <span className="font-mono text-[9px] text-[#7A8FA8]">
                       {formatDetected(item.timestamp)}
                     </span>
                   </div>
-                  <SeverityBadge severity={item.severity} compact />
+                  <SeverityBadge severity={item.severity} />
                 </button>
-              ))}
-            </div>
+              ))
+            )}
           </div>
         )}
       </div>

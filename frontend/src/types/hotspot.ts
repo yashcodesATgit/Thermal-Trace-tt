@@ -4,11 +4,18 @@ export type HotspotType =
   | 'natural_fire'
   | 'unknown';
 
+export type ActivityStatus = 'new' | 'recurring' | 'persistent' | 'under_review';
+
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
 
 export type HotspotStatus = 'active' | 'resolved' | 'monitoring';
 
-
+export interface OSMContextFeature {
+  id: string;
+  featureType: string;
+  name: string | null;
+  distanceKm: number;
+}
 
 export interface Hotspot {
   id: string;
@@ -29,18 +36,47 @@ export interface Hotspot {
   // ESA WorldCover 10m land-cover context
   landCoverClass?: number;
   landCoverName?: string;
+  frp?: number | null;
+  // Source Persistence & Operational Context
+  sourceObsCount?: number;
+  firstSeen?: string;
+  lastSeen?: string;
+  maxFrp?: number | null;
+  activityStatus?: ActivityStatus;
+  osmContext?: OSMContextFeature[];
 }
 
 export const HOTSPOT_COLORS: Record<HotspotType, string> = {
   industrial_thermal_source: '#FF4444',
   mining_thermal_source: '#FF8C00',
-  natural_fire: '#3DB86B',
-  unknown: '#4A5568',
+  natural_fire: '#10B981',
+  unknown: '#A855F7',
 };
 
 export const HOTSPOT_LABELS: Record<HotspotType, string> = {
   industrial_thermal_source: 'Industrial Thermal Source',
   mining_thermal_source: 'Mining Thermal Source',
   natural_fire: 'Natural Fire',
-  unknown: 'Unknown / Unclassified',
+  unknown: 'Under Review',
+};
+
+export const HOTSPOT_SUB_LABELS: Record<HotspotType, string> = {
+  industrial_thermal_source: 'ML: Confirmed Industrial',
+  mining_thermal_source: 'ML: Confirmed Mining',
+  natural_fire: 'ML: Natural Vegetation Fire',
+  unknown: 'ML: Unknown / Unclassified',
+};
+
+export const ACTIVITY_STATUS_LABELS: Record<ActivityStatus, string> = {
+  new: 'New Detection',
+  recurring: 'Active / Recurring',
+  persistent: 'Persistent Source',
+  under_review: 'Under Review',
+};
+
+export const ACTIVITY_STATUS_COLORS: Record<ActivityStatus, string> = {
+  new: '#38BDF8',       // Light Sky Blue
+  recurring: '#F59E0B', // Amber
+  persistent: '#EF4444',// Red
+  under_review: '#64748B' // Slate Grey
 };

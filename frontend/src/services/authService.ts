@@ -68,7 +68,7 @@ export const login = async (email: string, password: string, displayName?: strin
     console.warn('Supabase Auth connection fallback to backend authentication:', supaErr);
   }
 
-  // Seamless fallback to FastAPI backend auth endpoint
+  // Seamless fallback to Express backend auth endpoint
   const res = await api.post('/api/v1/auth/login', { email, password });
   const user: User = {
     ...res.data.user,
@@ -101,7 +101,7 @@ export const signup = async (name: string, email: string, password: string): Pro
     console.warn('Supabase Auth connection fallback to backend authentication:', supaErr);
   }
 
-  // Fallback to FastAPI backend auth endpoint
+  // Fallback to Express backend auth endpoint
   const res = await api.post('/api/v1/auth/signup', { name, email, password });
   setAuthData(res.data.token, res.data.user);
   return res.data.user;

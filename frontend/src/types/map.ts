@@ -18,4 +18,3 @@ export const INDIA_VIEWPORT: MapViewport = {
   bearing: DEFAULT_MAP_BEARING,
   pitch: DEFAULT_MAP_PITCH,
 };
-

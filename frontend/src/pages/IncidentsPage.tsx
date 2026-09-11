@@ -13,7 +13,7 @@ export default function IncidentsPage(): React.JSX.Element {
   const minimumConfidence = useMapStore((s) => s.minimumConfidence);
   const { data: hotspots, isLoading: hotspotsLoading } = useHotspotsQuery(selectedDate, minimumConfidence);
   const { data: facilities, isLoading: facilitiesLoading } = useFacilitiesQuery();
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [severityFilter, setSeverityFilter] = useState('all');
@@ -26,7 +26,7 @@ export default function IncidentsPage(): React.JSX.Element {
   const handleExport = () => {
     if (incidents.length === 0) return;
     const now = new Date().toISOString().split('T')[0];
-    
+
     // Quick filter check to only export what's visible
     const filtered = incidents.filter(inc => {
       const effectiveType = inc.mlType || inc.type;

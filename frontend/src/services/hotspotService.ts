@@ -2,7 +2,7 @@ import type { Hotspot } from '../types/hotspot';
 import api from './api';
 
 /**
- * Fetch hotspot data from FastAPI backend with canonical filters.
+ * Fetch hotspot data from Express backend with canonical filters.
  */
 export async function fetchHotspots(
   date?: string,
@@ -20,7 +20,7 @@ export async function fetchHotspots(
   if (state) {
     params.state = state;
   }
-  
+
   const response = await api.get('/api/v1/hotspots', { params });
   return response.data.data as Hotspot[];
 }
@@ -38,7 +38,7 @@ export interface ActivityResponse {
 }
 
 /**
- * Fetch 7-day hotspot activity aggregation from FastAPI backend.
+ * Fetch 7-day hotspot activity aggregation from Express backend.
  */
 export async function fetchHotspotActivity(
   endDate: string,
@@ -52,7 +52,7 @@ export async function fetchHotspotActivity(
   if (state) {
     params.state = state;
   }
-  
+
   const response = await api.get('/api/v1/hotspots/activity', { params });
   return response.data as ActivityResponse;
 }

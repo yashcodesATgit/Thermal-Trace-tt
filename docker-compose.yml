@@ -10,6 +10,8 @@ services:
     container_name: thermalwatch-redis
     networks:
       - thermalwatch-network
+    ports:
+      - "6379:6379"
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -18,28 +20,58 @@ services:
       retries: 5
     restart: unless-stopped
 
-  backend:
+  ml-service:
     build:
-      context: ./backend
+      context: ./ml-service
       dockerfile: Dockerfile
-    container_name: thermalwatch-backend
+    container_name: thermalwatch-ml-service
     networks:
       - thermalwatch-network
     ports:
-      - "8000:8000"
+      - "8001:8001"
     environment:
-      - REDIS_URL=redis://redis:6379/0
       - DATABASE_URL=${DATABASE_URL}
-      - DATABASE_URL_DIRECT=${DATABASE_URL_DIRECT}
+      - MODEL_PATH=/app/app/models/thermalwatch_model.joblib
+      - PORT=8001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  backend-node:
+    build:
+      context: ./backend-node
+      dockerfile: Dockerfile
+    container_name: thermalwatch-backend-node
+    networks:
+      - thermalwatch-network
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+      - ML_SERVICE_URL=http://ml-service:8001
       - FIRMS_MAP_KEY=${FIRMS_MAP_KEY}
       - FIRMS_SOURCES=${FIRMS_SOURCES:-VIIRS_SNPP_NRT,VIIRS_NOAA20_NRT,VIIRS_NOAA21_NRT}
       - FIRMS_INGESTION_DAYS=${FIRMS_INGESTION_DAYS:-5}
+      - JWT_SECRET=${JWT_SECRET:-thermalwatch_jwt_production_secret_key_2026}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - ENVIRONMENT=${ENVIRONMENT:-production}
-      - FRONTEND_ORIGIN=${FRONTEND_ORIGIN:-http://localhost:5173}
     depends_on:
       redis:
         condition: service_healthy
+      ml-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
   frontend:
@@ -47,13 +79,13 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_BASE_URL=http://localhost:8000
+        - VITE_API_URL=http://localhost:8080
     container_name: thermalwatch-frontend
     networks:
       - thermalwatch-network
     ports:
       - "5173:5173"
     depends_on:
-      backend:
+      backend-node:
         condition: service_healthy
     restart: unless-stopped

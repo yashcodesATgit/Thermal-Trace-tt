@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { HotspotType } from '../types/hotspot';
+import api from '../services/api';
+import type { HotspotType, ActivityStatus } from '../types/hotspot';
 import type { FacilityType } from '../types/facility';
 import type { MapStyleId } from '../config/mapStyles';
 import { getTodayISTString } from '../utils/dateUtils';
@@ -11,6 +12,7 @@ interface MapStoreState {
 
   // Filters
   activeHotspotTypes: HotspotType[];
+  activeActivityStatuses: ActivityStatus[];
   activeFacilityTypes: FacilityType[];
   minimumConfidence: number;
 
@@ -35,6 +37,8 @@ interface MapStoreState {
   fetchAndSetLatestDate: () => Promise<void>;
   setHotspotTypes: (types: HotspotType[]) => void;
   toggleHotspotType: (type: HotspotType) => void;
+  setActivityStatuses: (statuses: ActivityStatus[]) => void;
+  toggleActivityStatus: (status: ActivityStatus) => void;
   setFacilityTypes: (types: FacilityType[]) => void;
   toggleFacilityType: (type: FacilityType) => void;
   setMinimumConfidence: (confidence: number) => void;
@@ -55,6 +59,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
     'natural_fire',
     'unknown',
   ],
+  activeActivityStatuses: ['new', 'recurring', 'persistent', 'under_review'],
   activeFacilityTypes: [
     'refinery',
     'power_plant',
@@ -91,6 +96,15 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   fetchAndSetLatestDate: async () => {
     const state = get();
     if (state.isDateInitialized) return;
+    try {
+      const res = await api.get('/api/v1/hotspots/latest-date');
+      if (res.data?.date) {
+        set({ selectedDate: res.data.date, isDateInitialized: true });
+        return;
+      }
+    } catch (e) {
+      console.warn('Failed to fetch latest date from API, falling back to today IST', e);
+    }
     const today = getTodayISTString();
     set({ selectedDate: today, isDateInitialized: true });
   },
@@ -104,6 +118,17 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
         return { activeHotspotTypes: current.filter((t) => t !== type) };
       }
       return { activeHotspotTypes: [...current, type] };
+    }),
+
+  setActivityStatuses: (statuses) => set({ activeActivityStatuses: statuses }),
+
+  toggleActivityStatus: (status) =>
+    set((state) => {
+      const current = state.activeActivityStatuses;
+      if (current.includes(status)) {
+        return { activeActivityStatuses: current.filter((s) => s !== status) };
+      }
+      return { activeActivityStatuses: [...current, status] };
     }),
 
   setFacilityTypes: (types) => set({ activeFacilityTypes: types }),
@@ -136,6 +161,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
         'natural_fire',
         'unknown',
       ],
+      activeActivityStatuses: ['new', 'recurring', 'persistent', 'under_review'],
       activeFacilityTypes: [
         'refinery',
         'power_plant',
