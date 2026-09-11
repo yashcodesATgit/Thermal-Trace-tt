@@ -25,6 +25,11 @@ class AlertService {
       FROM alerts
       WHERE 1=1
     `;
+    let unackCountQuery = `
+      SELECT count(*) as unack_total
+      FROM alerts
+      WHERE 1=1 AND acknowledged = false
+    `;
 
     const values: any[] = [];
     const countValues: any[] = [];
@@ -33,15 +38,18 @@ class AlertService {
     const addFilter = (condition: string, value: any) => {
       query += ` AND ${condition.replace('$1', `$${paramIndex}`)}`;
       countQuery += ` AND ${condition.replace('$1', `$${paramIndex}`)}`;
+      unackCountQuery += ` AND ${condition.replace('$1', `$${paramIndex}`)}`;
       values.push(value);
       countValues.push(value);
       paramIndex++;
     };
 
     if (filters.severity) addFilter('severity = $1', filters.severity);
-    if (filters.acknowledged !== undefined && filters.acknowledged !== null) addFilter('acknowledged = $1', filters.acknowledged);
+    if (filters.acknowledged !== undefined && filters.acknowledged !== null) {
+      addFilter('acknowledged = $1', filters.acknowledged);
+    }
     if (filters.date_str) {
-      addFilter("date_trunc('day', timezone('Asia/Kolkata', timestamp)) = $1", filters.date_str);
+      addFilter("date_trunc('day', timezone('Asia/Kolkata', timestamp)) = $1::date", filters.date_str);
     }
 
     query += ` ORDER BY timestamp DESC`;
@@ -53,14 +61,21 @@ class AlertService {
     query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     values.push(pageSize, offset);
 
-    const [itemsResult, countResult] = await Promise.all([
+    const [itemsResult, countResult, unackResult] = await Promise.all([
       db.query(query, values),
-      db.query(countQuery, countValues)
+      db.query(countQuery, countValues),
+      db.query(unackCountQuery, countValues)
     ]);
+
+    const total = parseInt(countResult.rows[0].total, 10);
+    const unacknowledged_total = parseInt(unackResult.rows[0].unack_total, 10);
+    const total_pages = Math.ceil(total / pageSize);
 
     return {
       items: itemsResult.rows,
-      total: parseInt(countResult.rows[0].total, 10)
+      total,
+      unacknowledged_total,
+      total_pages
     };
   }
 }
@@ -89,20 +104,23 @@ alertsRouter.get('/alerts', async (req: Request, res: Response) => {
     else if (req.query.acknowledged === 'false') acknowledged = false;
 
     const filters = {
-      page, page_size,
+      page,
+      page_size,
       severity: req.query.severity,
       acknowledged: acknowledged,
       date_str: req.query.date_str
     };
 
-    const { items, total } = await alertService.list(filters);
+    const { items, total, unacknowledged_total, total_pages } = await alertService.list(filters);
 
     res.json({
       data: items.map(mapAlertRow),
       pagination: {
         page,
         page_size,
-        total
+        total,
+        unacknowledged_total,
+        total_pages
       }
     });
   } catch (err: any) {

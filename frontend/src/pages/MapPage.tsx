@@ -38,18 +38,18 @@ export default function MapPage(): React.JSX.Element {
       {/* ── 1. TOP NAVIGATION ─────────────────────────────────────────── */}
       <Navbar />
 
-      {/* ── 2. KPI STRIP ──────────────────────────────────────────────── */}
-      <KpiStrip />
-
-      {/* ── 3. MAIN WORKSPACE ─────────────────────────────────────────── */}
+      {/* ── 2. MAIN WORKSPACE (FULL HEIGHT SIDEBARS) ─────────────────── */}
       <main className="flex-1 min-h-0 flex w-full overflow-hidden relative">
-        {/* ── LEFT: Activity/Filter Rail (desktop only - Full Height) ─── */}
+        {/* ── LEFT: Activity/Filter Rail (desktop lg+ - Full Height) ─── */}
         <div className="hidden lg:block w-[220px] xl:w-[240px] shrink-0 h-full overflow-hidden border-r border-[#111A26]">
           <ActivityRail />
         </div>
 
-        {/* ── CENTER: Map & Thermal Activity Trend Chart ────────────── */}
+        {/* ── CENTER: KpiStrip + Map & Thermal Activity Trend Chart ──── */}
         <div className="flex-1 min-w-0 h-full flex flex-col overflow-hidden relative bg-[#060912]">
+          {/* KPI Summary Strip */}
+          <KpiStrip />
+
           {/* Map view area */}
           <div className="flex-1 min-h-0 w-full relative overflow-hidden">
             <Map mapRef={mapRef} />
@@ -82,7 +82,7 @@ export default function MapPage(): React.JSX.Element {
             </div>
           </div>
 
-          {/* Thermal Activity Trend / Bottom Analytics Strip (100% width of center column) */}
+          {/* Thermal Activity Trend / Bottom Analytics Strip */}
           <div className="h-[140px] sm:h-[152px] shrink-0 w-full border-t border-[#111A26] overflow-hidden">
             <BottomAnalytics />
           </div>

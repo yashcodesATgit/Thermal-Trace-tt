@@ -1,15 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchAlerts } from '../alertService';
-import type { Alert } from '../../types/alert';
+import { fetchAlertsData, AlertsQueryResult } from '../alertService';
 import { useMapStore } from '../../store/mapStore';
 
 export function useAlertsQuery(date?: string) {
   const selectedDate = useMapStore((s) => s.selectedDate);
   const targetDate = date || selectedDate;
 
-  return useQuery<Alert[]>({
+  return useQuery<AlertsQueryResult>({
     queryKey: ['alerts', targetDate],
-    queryFn: () => fetchAlerts(targetDate),
+    queryFn: () => fetchAlertsData(targetDate, 1, 20),
     refetchInterval: 10000,
     staleTime: 5000,
   });

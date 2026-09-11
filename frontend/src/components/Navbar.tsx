@@ -75,8 +75,9 @@ export default function Navbar(): React.JSX.Element {
     setIsMobileMenuOpen(false);
   };
 
-  const { data: alerts, isLoading: alertsLoading } = useAlertsQuery();
-  const unackCount = alerts?.filter((a) => !a.acknowledged).length ?? 0;
+  const { data: alertsQueryResult, isLoading: alertsLoading } = useAlertsQuery();
+  const alerts = alertsQueryResult?.alerts || [];
+  const unackCount = alertsQueryResult?.unackCount ?? 0;
 
   const navItems: NavItem[] = [
     { label: 'Map', path: '/', Icon: MapIcon },

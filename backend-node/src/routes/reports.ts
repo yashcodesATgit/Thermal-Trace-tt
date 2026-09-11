@@ -68,15 +68,16 @@ class ReportService {
       });
     }
 
-    const alertResult = await db.query(`SELECT severity FROM alerts LIMIT 50`);
-    const alerts = alertResult.rows;
-    const alertSummary = {
-      critical: alerts.filter(a => a.severity === "critical").length,
-      high: alerts.filter(a => a.severity === "high").length,
-      medium: alerts.filter(a => a.severity === "medium").length,
-      low: alerts.filter(a => a.severity === "low").length,
-      total: alerts.length
-    };
+    const alertResult = await db.query(`SELECT severity, COUNT(*)::int as count FROM alerts GROUP BY severity`);
+    const alertSummary: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0, total: 0 };
+    let totalAlertsCount = 0;
+    for (const r of alertResult.rows) {
+      const sev = r.severity || 'low';
+      const c = r.count || 0;
+      alertSummary[sev] = (alertSummary[sev] || 0) + c;
+      totalAlertsCount += c;
+    }
+    alertSummary.total = totalAlertsCount;
 
     const reportPayload = {
       reportMetadata: {

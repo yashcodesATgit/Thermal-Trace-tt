@@ -195,6 +195,25 @@ export default function RightPanel(): React.JSX.Element | null {
       .slice(0, 8);
   }, [activeHotspot, hotspots]);
 
+  const parsedExplanation = useMemo(() => {
+    if (!activeHotspot?.mlExplanation) return null;
+    let exp = activeHotspot.mlExplanation;
+    if (typeof exp === 'object') return exp;
+    try {
+      let parsed = JSON.parse(exp);
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          // ignore double parse error
+        }
+      }
+      return parsed;
+    } catch {
+      return activeHotspot.mlExplanation;
+    }
+  }, [activeHotspot?.mlExplanation]);
+
   const handleClose = () => {
     selectHotspot(null);
     selectFacility(null);
@@ -210,13 +229,14 @@ export default function RightPanel(): React.JSX.Element | null {
     subtitle?: string;
     showClose?: boolean;
   }) => (
-    <div className="px-4 py-2.5 border-b border-[#111A26] shrink-0 bg-[#06090F] flex items-center justify-between">
-      <div>
-        <span className="text-[9px] font-bold tracking-widest text-[#3B5070] uppercase">
+    <div className="px-3.5 py-2 border-b border-[#111A26] shrink-0 bg-[#06090F] flex items-center justify-between">
+      <div className="flex items-center gap-1.5 min-w-0">
+        <Info className="w-3 h-3 text-[#2D7DD2] shrink-0" />
+        <span className="text-[10px] font-bold tracking-widest text-[#5A6E8A] uppercase truncate">
           {title}
         </span>
         {subtitle && (
-          <p className="text-[10px] text-[#4A5D78] mt-0.5">{subtitle}</p>
+          <span className="text-[9px] text-[#4A5D78] truncate">({subtitle})</span>
         )}
       </div>
       {showClose && (
@@ -224,7 +244,7 @@ export default function RightPanel(): React.JSX.Element | null {
           type="button"
           aria-label="Deselect"
           onClick={handleClose}
-          className="text-[#2A3D55] hover:text-[#7A8FA8] p-1 rounded transition-colors cursor-pointer hover:bg-[#0F1A2B]"
+          className="text-[#3B4D63] hover:text-[#2D7DD2] p-1 rounded transition-colors cursor-pointer hover:bg-[#0F1A2B] shrink-0"
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -349,24 +369,15 @@ export default function RightPanel(): React.JSX.Element | null {
 
   return (
     <aside className="w-full h-full flex flex-col bg-[#080C14] overflow-hidden select-none border-l border-[#111A26]">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-[#111A26] shrink-0 bg-[#06090F]">
-        {/* Top row: badges + close */}
+      {/* Upper Panel Header */}
+      <PanelHeader title="Hotspot Intelligence" showClose={isUserSelected} />
+
+      {/* Header Info Block */}
+      <div className="px-3.5 py-2.5 border-b border-[#111A26] shrink-0 bg-[#06090F]">
+        {/* Top row: badges */}
         <div className="flex items-center justify-between mb-2">
           <ActivityBadge status={activeHotspot.activityStatus} />
-          <div className="flex items-center gap-1.5">
-            <SeverityBadge severity={activeHotspot.severity} />
-            {isUserSelected && (
-              <button
-                type="button"
-                aria-label="Deselect hotspot"
-                onClick={handleClose}
-                className="text-[#2A3D55] hover:text-[#7A8FA8] p-1 rounded transition-colors cursor-pointer hover:bg-[#0F1A2B]"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+          <SeverityBadge severity={activeHotspot.severity} />
         </div>
 
         {/* Classification block */}
@@ -377,9 +388,9 @@ export default function RightPanel(): React.JSX.Element | null {
           >
             <Flame className="w-4 h-4" style={{ color: typeColor }} />
           </div>
-          <div>
-            <h2 className="text-sm font-bold text-[#D0DAE8] leading-tight">{mlLabel}</h2>
-            <p className="text-[9px] font-mono text-[#4A5D78] mt-0.5">{mlSubLabel}</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xs sm:text-sm font-bold text-[#D0DAE8] leading-tight truncate">{mlLabel}</h2>
+            <p className="text-[9px] font-mono text-[#4A5D78] mt-0.5 truncate">{mlSubLabel}</p>
             <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
               <span className="text-[8px] font-bold text-[#10B981] bg-[rgba(16,185,129,0.12)] px-1.5 py-0.5 rounded border border-[rgba(16,185,129,0.2)]">
                 FIRMS {activeHotspot.confidence}%
@@ -404,7 +415,7 @@ export default function RightPanel(): React.JSX.Element | null {
         )}
 
         {/* Tabs */}
-        <div className="flex items-center gap-4 mt-3 pt-2 border-t border-[#0E1825]">
+        <div className="flex items-center gap-4 mt-2.5 pt-2 border-t border-[#0E1825]">
           <Tab label="Overview" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
           <Tab label="Nearby" active={activeTab === 'infrastructure'} onClick={() => setActiveTab('infrastructure')} />
           <Tab
@@ -416,10 +427,10 @@ export default function RightPanel(): React.JSX.Element | null {
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-3 pb-8 space-y-2.5">
         {/* ── OVERVIEW TAB ────────────────────────────────────────────────── */}
         {activeTab === 'overview' && (
-          <div className="p-3 space-y-2.5">
+          <div className="space-y-2.5">
             {/* 1. THERMAL SIGNAL */}
             <div className="bg-[#0C1520] rounded-lg border border-[#111A26] p-3">
               <div className="flex items-center justify-between mb-2">
@@ -541,47 +552,47 @@ export default function RightPanel(): React.JSX.Element | null {
                     {activeHotspot.osmContext[0].distanceKm > 15 ? 'NEAREST MAPPED' : 'LOCAL'}
                   </span>
                 </div>
-                <div className="bg-[#080C14] p-2 rounded border border-[#111A26] flex items-center justify-between">
-                  <div>
+                <div className="bg-[#080C14] p-2 rounded border border-[#111A26] flex items-center justify-between gap-2">
+                  <div className="min-w-0">
                     <span className="text-[8px] font-semibold text-[#5A7090] uppercase block">
                       Nearest Mapped Facility
                     </span>
-                    <span className="text-xs font-semibold text-[#C8D4E3] block capitalize">
+                    <span className="text-xs font-semibold text-[#C8D4E3] block capitalize truncate">
                       {activeHotspot.osmContext[0].name || activeHotspot.osmContext[0].featureType.replace(/_/g, ' ')}
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono font-bold text-[#38BDF8] bg-[#0C1520] px-2 py-1 rounded border border-[#1E2D45]">
+                  <span className="text-[10px] font-mono font-bold text-[#38BDF8] bg-[#0C1520] px-2 py-1 rounded border border-[#1E2D45] shrink-0">
                     {activeHotspot.osmContext[0].distanceKm.toFixed(1)} km
                   </span>
                 </div>
               </div>
             )}
 
-            {/* 6. ML V2 MODEL EVIDENCE / EXPLANATION */}
-            {activeHotspot.mlExplanation && (
+            {/* 6. MODEL EVIDENCE / EXPLANATION CARD */}
+            {parsedExplanation && (
               <div className="bg-[#0C1520] rounded-lg border border-[#111A26] p-3">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[9px] font-bold text-[#38BDF8] uppercase tracking-wider">
-                    ML V2 DECISION FACTORS
+                    MODEL DECISION FACTORS
                   </span>
                   <span className="text-[8px] font-mono text-[#5A7090]">
-                    {activeHotspot.modelVersion || 'v2'}
+                    {activeHotspot.modelVersion || 'thermalwatch-v1'}
                   </span>
                 </div>
-                {typeof activeHotspot.mlExplanation === 'object' ? (
+                {typeof parsedExplanation === 'object' && !Array.isArray(parsedExplanation) ? (
                   <div className="space-y-1">
-                    {Object.entries(activeHotspot.mlExplanation).map(([key, val]) => (
-                      <div key={key} className="flex items-center justify-between text-[10px] py-0.5 border-b border-[#0E1825] last:border-0">
-                        <span className="text-[#5A7090] font-mono">{key.replace(/_/g, ' ')}</span>
-                        <span className="font-mono font-bold text-[#38BDF8]">
-                          {typeof val === 'number' ? val.toFixed(3) : String(val)}
+                    {Object.entries(parsedExplanation).map(([key, val]) => (
+                      <div key={key} className="flex items-center justify-between text-[10px] py-0.5 border-b border-[#0E1825] last:border-0 gap-2">
+                        <span className="text-[#5A7090] font-mono capitalize truncate shrink-0 max-w-[65%]">{key.replace(/_/g, ' ')}</span>
+                        <span className="font-mono font-bold text-[#38BDF8] text-right truncate">
+                          {typeof val === 'number' ? (val % 1 !== 0 ? val.toFixed(2) : val) : String(val)}
                         </span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[10px] text-[#7A8FA8] leading-relaxed">
-                    {activeHotspot.mlExplanation}
+                  <p className="text-[10px] font-mono text-[#7A8FA8] leading-relaxed break-words overflow-hidden whitespace-pre-wrap max-h-36 overflow-y-auto">
+                    {String(parsedExplanation)}
                   </p>
                 )}
               </div>

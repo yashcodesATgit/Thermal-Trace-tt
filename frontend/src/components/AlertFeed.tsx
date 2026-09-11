@@ -7,13 +7,13 @@ import type { AlertSeverity, Alert } from '../types/alert';
 
 export default function AlertFeed(): React.JSX.Element {
   const navigate = useNavigate();
-  const { data: alerts, isLoading } = useAlertsQuery();
+  const { data: alertsQueryResult, isLoading } = useAlertsQuery();
+  const alerts = alertsQueryResult?.alerts || [];
+  const unackCount = alertsQueryResult?.unackCount ?? 0;
   const selectHotspot = useMapStore((s) => s.selectHotspot);
   const selectFacility = useMapStore((s) => s.selectFacility);
   const setSelectedDate = useMapStore((s) => s.setSelectedDate);
   const [isOpen, setIsOpen] = React.useState(false);
-
-  const unackCount = alerts?.filter((a) => !a.acknowledged).length ?? 0;
 
   const handleAlertClick = (alert: Alert) => {
     if (alert.timestamp) {
